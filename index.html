@@ -1,0 +1,325 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0f1115">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>Glow-Up Progress</title>
+<style>
+:root{--bg:#0f1115;--card:#181b22;--line:#262a33;--ink:#f2f3f5;--mut:#9aa1ad;--acc:#7cf0b4;--acc2:#2bb673;--bad:#ff7a7a}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+body{padding:calc(env(safe-area-inset-top) + 14px) 16px calc(env(safe-area-inset-bottom) + 84px)}
+h1{font-size:22px;margin:0 0 2px}
+.sub{color:var(--mut);font-size:14px;margin:0 0 14px}
+.bar{height:8px;background:var(--line);border-radius:6px;overflow:hidden;margin:6px 0 16px}
+.bar i{display:block;height:100%;background:linear-gradient(90deg,var(--acc2),var(--acc));width:0}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px;margin-bottom:12px}
+.row{display:flex;gap:12px;align-items:center}
+.thumb{width:84px;height:112px;border-radius:10px;background:#0b0d11 center/cover no-repeat;border:1px solid var(--line);flex:none;display:flex;align-items:center;justify-content:center;color:var(--mut);font-size:12px;text-align:center}
+.grow{flex:1;min-width:0}
+.t{font-weight:650;font-size:17px}
+.h{color:var(--mut);font-size:13px;margin-top:2px}
+button,.btn{appearance:none;border:0;border-radius:12px;padding:12px 16px;font:inherit;font-weight:650;background:var(--acc);color:#06210f;cursor:pointer}
+button.sec,.btn.sec{background:#222731;color:var(--ink)}
+button.bad{background:#3a1d1d;color:var(--bad)}
+button:disabled{opacity:.45}
+.done{color:var(--acc);font-size:13px;font-weight:650}
+nav{position:fixed;left:0;right:0;bottom:0;display:flex;background:#12151b;border-top:1px solid var(--line);padding:6px 6px calc(env(safe-area-inset-bottom) + 6px);z-index:5}
+nav button{flex:1;background:transparent;color:var(--mut);padding:10px 4px;font-size:13px;border-radius:10px}
+nav button.on{color:var(--acc);background:#1a2420}
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.grid .g{aspect-ratio:3/4;background:#0b0d11 center/cover no-repeat;border-radius:10px;border:1px solid var(--line);position:relative}
+.grid .g span{position:absolute;left:4px;bottom:4px;font-size:11px;background:#000a;padding:1px 6px;border-radius:6px}
+.seg{display:flex;gap:6px;margin-bottom:12px}
+.seg button{flex:1;background:#222731;color:var(--ink);padding:9px 6px;font-size:14px}
+.seg button.on{background:var(--acc);color:#06210f}
+select,input[type=number]{width:100%;background:#0b0d11;color:var(--ink);border:1px solid var(--line);border-radius:10px;padding:11px;font:inherit}
+.cmp{position:relative;width:100%;aspect-ratio:3/4;border-radius:14px;overflow:hidden;background:#0b0d11;border:1px solid var(--line)}
+.cmp img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.cmp .top{clip-path:inset(0 50% 0 0)}
+.cmp .line{position:absolute;top:0;bottom:0;width:2px;background:var(--acc);left:50%}
+.cmp .lab{position:absolute;top:8px;font-size:12px;background:#000a;padding:2px 8px;border-radius:8px}
+input[type=range]{width:100%;accent-color:var(--acc)}
+.empty{color:var(--mut);text-align:center;padding:40px 10px}
+.hide{display:none!important}
+#cam{position:fixed;inset:0;background:#000;z-index:20;display:flex;flex-direction:column}
+#cam video{flex:1;min-height:0;width:100%;object-fit:cover}
+#ghost{position:absolute;left:0;right:0;top:0;bottom:150px;width:100%;height:calc(100% - 150px);object-fit:cover;opacity:.35;pointer-events:none}
+#camtop{position:absolute;top:calc(env(safe-area-inset-top) + 10px);left:12px;right:12px;display:flex;justify-content:space-between}
+#camtop button{background:#000a;color:#fff;padding:10px 14px}
+#camctl{height:150px;background:#000;display:flex;flex-direction:column;justify-content:center;gap:10px;padding:8px 18px calc(env(safe-area-inset-bottom) + 8px)}
+#shutter{width:72px;height:72px;border-radius:50%;background:#fff;border:5px solid #888;padding:0}
+#count{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:120px;font-weight:800;color:#fff;text-shadow:0 2px 20px #000;pointer-events:none}
+#viewer{position:fixed;inset:0;background:#000e;z-index:15;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:16px}
+#viewer img{max-width:100%;max-height:72vh;border-radius:12px}
+.note{color:var(--mut);font-size:13px}
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<nav>
+  <button data-v="today" class="on">Today</button>
+  <button data-v="timeline">Timeline</button>
+  <button data-v="compare">Compare</button>
+  <button data-v="settings">Backup</button>
+</nav>
+
+<div id="cam" class="hide">
+  <video id="vid" playsinline muted autoplay></video>
+  <img id="ghost" alt="">
+  <div id="camtop"><button id="camclose">Close</button><button id="camflip">Flip</button></div>
+  <div id="count" class="hide"></div>
+  <div id="camctl">
+    <div class="row">
+      <span class="note" style="color:#bbb">Ghost</span>
+      <input type="range" id="gh" min="0" max="70" value="35">
+      <select id="timer" style="width:92px"><option value="0">No timer</option><option value="3">3 s</option><option value="10" selected>10 s</option></select>
+    </div>
+    <div style="display:flex;justify-content:center"><button id="shutter" aria-label="Take photo"></button></div>
+  </div>
+</div>
+
+<div id="viewer" class="hide"></div>
+<input type="file" id="fallback" accept="image/*" capture class="hide">
+
+<script>
+(() => {
+'use strict';
+const START = new Date('2026-10-01T00:00:00');
+const END   = new Date('2027-04-01T00:00:00');
+const SLOTS = [
+  {id:'face',  label:'Face',       facing:'user',        hint:'Straight on, neutral face, hair back, same light every day'},
+  {id:'front', label:'Body front', facing:'environment', hint:'Arms relaxed, full body, same spot and distance'},
+  {id:'side',  label:'Body side',  facing:'environment', hint:'Left side, arms relaxed, stand tall'}
+];
+const $ = s => document.querySelector(s);
+const todayStr = () => new Date().toLocaleDateString('sv');
+const dayDiff = (a,b) => Math.round((b - a) / 86400000);
+
+// ---------- storage (IndexedDB, on this phone only) ----------
+let db;
+const open = () => new Promise((res, rej) => {
+  const r = indexedDB.open('glowup', 1);
+  r.onupgradeneeded = () => { r.result.createObjectStore('photos'); r.result.createObjectStore('meta'); };
+  r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error);
+});
+const tx = (store, mode, fn) => new Promise((res, rej) => {
+  const t = db.transaction(store, mode), s = t.objectStore(store), q = fn(s);
+  t.oncomplete = () => res(q && q.result); t.onerror = () => rej(t.error);
+});
+const putPhoto = (date, slot, blob) => tx('photos','readwrite', s => s.put({date, slot, blob, ts: Date.now()}, date + '|' + slot));
+const delPhoto = (date, slot) => tx('photos','readwrite', s => s.delete(date + '|' + slot));
+const allPhotos = () => tx('photos','readonly', s => s.getAll());
+const getMeta = date => tx('meta','readonly', s => s.get(date));
+const putMeta = (date, v) => tx('meta','readwrite', s => s.put(v, date));
+const allMeta = () => new Promise((res, rej) => {
+  const out = {}, t = db.transaction('meta'), c = t.objectStore('meta').openCursor();
+  c.onsuccess = () => { const k = c.result; if (k) { out[k.key] = k.value; k.continue(); } else res(out); };
+  c.onerror = () => rej(c.error);
+});
+
+let photos = [], urls = new Map();
+const url = p => { const k = p.date + '|' + p.slot; if (!urls.has(k)) urls.set(k, URL.createObjectURL(p.blob)); return urls.get(k); };
+async function reload() { photos = (await allPhotos()).sort((a,b) => a.date.localeCompare(b.date)); }
+const forSlot = id => photos.filter(p => p.slot === id);
+const lastBefore = (slot, date) => forSlot(slot).filter(p => p.date < date).pop();
+
+// ---------- views ----------
+let view = 'today', tlSlot = 'face', cmpSlot = 'face';
+const app = $('#app');
+
+function header() {
+  const now = new Date(todayStr() + 'T00:00:00');
+  const left = Math.max(0, dayDiff(now, END));
+  const day = dayDiff(START, now) + 1;
+  const pct = Math.min(100, Math.max(0, (dayDiff(START, now) / dayDiff(START, END)) * 100));
+  const title = day < 1 ? 'Starts 1 October' : 'Day ' + day;
+  return `<h1>${title}</h1><p class="sub">${left} days until 1 April 2027</p><div class="bar"><i style="width:${pct}%"></i></div>`;
+}
+
+async function renderToday() {
+  const d = todayStr(), meta = (await getMeta(d)) || {};
+  const taken = SLOTS.filter(s => photos.some(p => p.date === d && p.slot === s.id)).length;
+  let h = header();
+  h += `<p class="sub" style="margin-top:-6px">${taken} of ${SLOTS.length} photos today</p>`;
+  for (const s of SLOTS) {
+    const mine = photos.find(p => p.date === d && p.slot === s.id);
+    const prev = lastBefore(s.id, d);
+    const shown = mine || prev;
+    h += `<div class="card"><div class="row">
+      <div class="thumb" style="${shown ? `background-image:url(${url(shown)})` : ''}">${shown ? '' : 'No photo yet'}</div>
+      <div class="grow"><div class="t">${s.label}</div>
+        <div class="h">${mine ? '<span class="done">Done today</span>' : s.hint}</div>
+        ${prev && !mine ? `<div class="h">Showing last photo (${prev.date})</div>` : ''}
+        <div style="margin-top:10px"><button data-cap="${s.id}">${mine ? 'Retake' : 'Take photo'}</button></div>
+      </div></div></div>`;
+  }
+  h += `<div class="card"><div class="t" style="margin-bottom:8px">Weight today (optional)</div>
+    <div class="row"><input type="number" id="w" step="0.1" inputmode="decimal" placeholder="kg" value="${meta.weight ?? ''}">
+    <button class="sec" id="wsave">Save</button></div>
+    <div class="note" style="margin-top:6px">Weigh once a week, Sunday morning. The daily number is noise.</div></div>`;
+  app.innerHTML = h;
+  document.querySelectorAll('[data-cap]').forEach(b => b.onclick = () => capture(SLOTS.find(s => s.id === b.dataset.cap)));
+  $('#wsave').onclick = async () => {
+    const v = parseFloat($('#w').value);
+    await putMeta(d, Object.assign({}, meta, {weight: isNaN(v) ? null : v}));
+    $('#wsave').textContent = 'Saved';
+  };
+}
+
+function segHtml(cur, attr) {
+  return `<div class="seg">${SLOTS.map(s => `<button ${attr}="${s.id}" class="${cur === s.id ? 'on' : ''}">${s.label}</button>`).join('')}</div>`;
+}
+
+function renderTimeline() {
+  const list = forSlot(tlSlot).slice().reverse();
+  let h = `<h1>Timeline</h1><p class="sub">Every photo you took</p>` + segHtml(tlSlot, 'data-tl');
+  h += list.length ? `<div class="grid">${list.map(p => `<div class="g" data-open="${p.date}|${p.slot}" style="background-image:url(${url(p)})"><span>${p.date.slice(5)}</span></div>`).join('')}</div>`
+                   : `<div class="empty">No ${SLOTS.find(s => s.id === tlSlot).label.toLowerCase()} photos yet.<br>Take your first one on the Today tab.</div>`;
+  app.innerHTML = h;
+  document.querySelectorAll('[data-tl]').forEach(b => b.onclick = () => { tlSlot = b.dataset.tl; renderTimeline(); });
+  document.querySelectorAll('[data-open]').forEach(b => b.onclick = () => {
+    const [date, slot] = b.dataset.open.split('|'); const p = photos.find(x => x.date === date && x.slot === slot);
+    const v = $('#viewer'); v.classList.remove('hide');
+    v.innerHTML = `<img src="${url(p)}"><div class="note" style="color:#ddd">${p.date}</div>
+      <div class="row"><button class="sec" id="vc">Close</button><button class="bad" id="vd">Delete</button></div>`;
+    $('#vc').onclick = () => v.classList.add('hide');
+    $('#vd').onclick = async () => { if (confirm('Delete this photo?')) { await delPhoto(date, slot); urls.delete(date + '|' + slot); await reload(); v.classList.add('hide'); renderTimeline(); } };
+  });
+}
+
+let flip = null;
+function renderCompare() {
+  clearInterval(flip);
+  const list = forSlot(cmpSlot);
+  let h = `<h1>Compare</h1><p class="sub">Drag the slider to see the change</p>` + segHtml(cmpSlot, 'data-cs');
+  if (list.length < 2) {
+    h += `<div class="empty">You need at least two ${SLOTS.find(s => s.id === cmpSlot).label.toLowerCase()} photos to compare.</div>`;
+    app.innerHTML = h; bindSeg(); return;
+  }
+  const opts = sel => list.map(p => `<option value="${p.date}" ${p.date === sel ? 'selected' : ''}>${p.date}</option>`).join('');
+  const A = list[0].date, B = list[list.length - 1].date;
+  h += `<div class="row" style="margin-bottom:10px"><select id="ca">${opts(A)}</select><select id="cb">${opts(B)}</select></div>
+    <div class="cmp" id="cmp"><img id="ib" alt=""><img id="ia" class="top" alt=""><div class="line" id="ln"></div>
+      <span class="lab" style="left:8px" id="la"></span><span class="lab" style="right:8px" id="lb"></span></div>
+    <input type="range" id="sl" min="0" max="100" value="50" style="margin-top:12px">
+    <div class="row" style="margin-top:10px"><button class="sec grow" id="play">Play all photos</button></div>`;
+  app.innerHTML = h; bindSeg();
+  const set = () => {
+    const a = list.find(p => p.date === $('#ca').value), b = list.find(p => p.date === $('#cb').value);
+    $('#ia').src = url(a); $('#ib').src = url(b); $('#la').textContent = a.date; $('#lb').textContent = b.date;
+  };
+  const move = () => { const v = $('#sl').value; $('#ia').style.clipPath = `inset(0 ${100 - v}% 0 0)`; $('#ln').style.left = v + '%'; };
+  $('#ca').onchange = set; $('#cb').onchange = set; $('#sl').oninput = move; set(); move();
+  $('#play').onclick = () => {
+    clearInterval(flip); let i = 0; $('#ia').style.clipPath = 'inset(0 100% 0 0)'; $('#ln').classList.add('hide');
+    flip = setInterval(() => { const p = list[i % list.length]; $('#ib').src = url(p); $('#lb').textContent = p.date; $('#la').textContent = ''; i++; }, 280);
+  };
+}
+function bindSeg() { document.querySelectorAll('[data-cs]').forEach(b => b.onclick = () => { cmpSlot = b.dataset.cs; renderCompare(); }); }
+
+async function renderSettings() {
+  const persisted = navigator.storage && navigator.storage.persisted ? await navigator.storage.persisted() : false;
+  const est = navigator.storage && navigator.storage.estimate ? await navigator.storage.estimate() : null;
+  const mb = est ? (est.usage / 1048576).toFixed(1) : '?';
+  app.innerHTML = `<h1>Backup</h1><p class="sub">Your photos live only on this phone</p>
+    <div class="card"><div class="t">${photos.length} photos · ${mb} MB used</div>
+      <div class="h" style="margin:6px 0 12px">${persisted ? 'Storage is protected from being cleared by the phone.' : 'The phone could clear this storage if it runs very low on space. Make a backup now and then.'}</div>
+      <button id="zip" ${photos.length ? '' : 'disabled'}>Save all photos as a ZIP</button>
+      <div class="note" style="margin-top:8px">Saves to your Downloads. Do this every Sunday.</div></div>
+    <div class="card"><div class="t">Privacy</div><div class="h">Nothing is ever uploaded. There is no account and no server. The photos exist only in this app on this phone, plus any ZIP you save yourself.</div></div>`;
+  $('#zip').onclick = makeZip;
+}
+
+// ---------- zip (store only; JPEGs are already compressed) ----------
+const crcT = (() => { const t = []; for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
+const crc32 = u8 => { let c = 0xFFFFFFFF; for (let i = 0; i < u8.length; i++) c = crcT[(c ^ u8[i]) & 255] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; };
+async function makeZip() {
+  const enc = new TextEncoder(), parts = [], cd = []; let off = 0;
+  const u16 = n => [n & 255, (n >> 8) & 255], u32 = n => [n & 255, (n >> 8) & 255, (n >> 16) & 255, (n >>> 24) & 255];
+  for (const p of photos) {
+    const name = enc.encode(`${p.date}_${p.slot}.jpg`), data = new Uint8Array(await p.blob.arrayBuffer()), crc = crc32(data);
+    const lh = new Uint8Array([0x50,0x4b,3,4, 20,0, 0,0, 0,0, 0,0, 0,0, ...u32(crc), ...u32(data.length), ...u32(data.length), ...u16(name.length), 0,0]);
+    parts.push(lh, name, data);
+    cd.push(new Uint8Array([0x50,0x4b,1,2, 20,0, 20,0, 0,0, 0,0, 0,0, 0,0, ...u32(crc), ...u32(data.length), ...u32(data.length), ...u16(name.length), 0,0, 0,0, 0,0, 0,0, 0,0,0,0, ...u32(off)]), name);
+    off += lh.length + name.length + data.length;
+  }
+  const cdSize = cd.reduce((a, b) => a + b.length, 0);
+  const end = new Uint8Array([0x50,0x4b,5,6, 0,0, 0,0, ...u16(photos.length), ...u16(photos.length), ...u32(cdSize), ...u32(off), 0,0]);
+  const blob = new Blob([...parts, ...cd, end], {type: 'application/zip'});
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `glowup-photos-${todayStr()}.zip`;
+  document.body.appendChild(a); a.click(); a.remove();
+}
+
+// ---------- camera ----------
+let stream = null, curSlot = null, facing = 'user', busy = false;
+async function capture(slot) {
+  curSlot = slot; facing = slot.facing;
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return fallbackPick();
+  try { await startCam(); } catch (e) { fallbackPick(); }
+}
+async function startCam() {
+  stopCam();
+  stream = await navigator.mediaDevices.getUserMedia({video: {facingMode: {ideal: facing}, width: {ideal: 1920}, height: {ideal: 1440}}, audio: false});
+  $('#vid').srcObject = stream;
+  const prev = lastBefore(curSlot.id, todayStr());
+  const gh = $('#ghost'); if (prev) { gh.src = url(prev); gh.classList.remove('hide'); } else gh.classList.add('hide');
+  gh.style.opacity = $('#gh').value / 100;
+  $('#cam').classList.remove('hide');
+}
+function stopCam() { if (stream) stream.getTracks().forEach(t => t.stop()); stream = null; }
+function closeCam() { stopCam(); $('#cam').classList.add('hide'); $('#count').classList.add('hide'); busy = false; }
+$('#camclose').onclick = closeCam;
+$('#camflip').onclick = async () => { facing = facing === 'user' ? 'environment' : 'user'; try { await startCam(); } catch (e) {} };
+$('#gh').oninput = () => { $('#ghost').style.opacity = $('#gh').value / 100; };
+$('#shutter').onclick = async () => {
+  if (busy) return; busy = true;
+  let n = parseInt($('#timer').value, 10); const c = $('#count');
+  while (n > 0) { c.textContent = n; c.classList.remove('hide'); await new Promise(r => setTimeout(r, 1000)); n--; }
+  c.classList.add('hide'); await snap(); busy = false;
+};
+async function snap() {
+  const v = $('#vid'), w = v.videoWidth, h = v.videoHeight; if (!w) return;
+  const k = Math.min(1, 1600 / Math.max(w, h)), cv = document.createElement('canvas');
+  cv.width = Math.round(w * k); cv.height = Math.round(h * k); cv.getContext('2d').drawImage(v, 0, 0, cv.width, cv.height);
+  const blob = await new Promise(r => cv.toBlob(r, 'image/jpeg', 0.88));
+  await save(blob);
+}
+async function save(blob) {
+  const d = todayStr(); await putPhoto(d, curSlot.id, blob); urls.delete(d + '|' + curSlot.id);
+  await reload(); closeCam(); show(view);
+}
+function fallbackPick() {
+  const f = $('#fallback'); f.setAttribute('capture', curSlot.facing === 'user' ? 'user' : 'environment'); f.value = '';
+  f.onchange = async () => { const file = f.files[0]; if (!file) return; const img = await createImageBitmap(file); const k = Math.min(1, 1600 / Math.max(img.width, img.height));
+    const cv = document.createElement('canvas'); cv.width = Math.round(img.width * k); cv.height = Math.round(img.height * k); cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
+    await save(await new Promise(r => cv.toBlob(r, 'image/jpeg', 0.88))); };
+  f.click();
+}
+
+// ---------- nav ----------
+async function show(v) {
+  view = v; document.querySelectorAll('nav button').forEach(b => b.classList.toggle('on', b.dataset.v === v));
+  if (v !== 'compare') clearInterval(flip);
+  if (v === 'today') await renderToday(); else if (v === 'timeline') renderTimeline(); else if (v === 'compare') renderCompare(); else await renderSettings();
+  window.scrollTo(0, 0);
+}
+document.querySelectorAll('nav button').forEach(b => b.onclick = () => show(b.dataset.v));
+
+(async () => {
+  db = await open(); await reload();
+  if (navigator.storage && navigator.storage.persist) navigator.storage.persist();
+  window.__app = {show, reload, get photos() { return photos; }};
+  show('today');
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+})();
+})();
+</script>
+</body>
+</html>
