@@ -13,6 +13,7 @@ const dayIndex = s => Math.round((parse(s) - parse(START)) / 864e5) + 1;
 const WD = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
 const MO = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 const pretty = s => { const d = parse(s); return WD[d.getDay()] + ' ' + d.getDate() + ' ' + MO[d.getMonth()]; };
+const shortD = s => { const d = parse(s); return WD[d.getDay()].slice(0, 3) + ' ' + d.getDate() + ' ' + MO[d.getMonth()]; };
 const r0 = n => Math.round(n);
 const r1 = n => Math.round(n * 10) / 10;
 const SESSION_TXT = {1:'Lower A + 15 min incline walk', 2:'Upper A + 15 min incline walk', 3:'40 min easy cardio', 4:'Lower B + 15 min incline walk', 5:'Upper B + 15 min incline walk', 6:'40 min easy cardio', 0:'Rest · weigh-in · long walk · meal prep'};
@@ -43,8 +44,9 @@ const dbEntries = store => new Promise((res, rej) => {
   c.onerror = () => rej(c.error);
 });
 
-const S = { days: {}, pantry: {}, shop: {}, log: [], set: {plan: {}, basics: {}}, photos: [] };
+const S = { days: {}, pantry: {}, shop: {}, log: [], set: {plan: {}, basics: {}}, photos: [], scans: [] };
 const ui = { view: 'today', mealsDate: null, open: {}, pt: 'take', tlSlot: 'face', cmpSlot: 'face', food: 'pantry', prog: 'photos', areas: 'face' };
+const LINE_START = '2026-10-04', HOLD_SUNDAYS = ['2026-11-22'], WEEKS = 26;
 
 async function loadAll() {
   S.days = {}; S.pantry = {}; S.shop = {}; S.log = [];
@@ -55,9 +57,11 @@ async function loadAll() {
   S.log.sort((a, b) => a.ts - b.ts);
   const kv = (await dbEntries('kv')).find(e => e.k === 'settings');
   S.set = Object.assign({plan: {}, basics: {}}, kv ? kv.v : {});
+  const sc = (await dbEntries('kv')).find(e => e.k === 'scans'); S.scans = sc ? sc.v : [];
   await reloadPhotos();
 }
 const saveSet = () => dbPut('kv', 'settings', S.set);
+const saveScans = () => dbPut('kv', 'scans', S.scans);
 async function saveDay(date, patch) { S.days[date] = Object.assign({}, S.days[date], patch); await dbPut('days', date, S.days[date]); }
 async function setPantry(id, patch) {
   const cur = S.pantry[id] || {id};
@@ -149,7 +153,7 @@ function render() {
 }
 const subSeg = (cur, act, items) => '<div class="seg">' + items.map(([k, l]) => '<button data-act="' + act + '" data-id="' + k + '" class="' + (cur === k ? 'on' : '') + '">' + l + '</button>').join('') + '</div>';
 function vFood() { return subSeg(ui.food, 'fsub', [['pantry', 'Pantry'], ['shop', 'Shop']]) + (ui.food === 'shop' ? vShop() : vPantry()); }
-function vProgress() { return subSeg(ui.prog, 'psub', [['photos', 'Photos']]) + vPhotos(); }
+function vProgress() { return subSeg(ui.prog, 'psub', [['photos', 'Photos'], ['weight', 'Weight'], ['scans', 'Scans']]) + (ui.prog === 'weight' ? vWeight() : ui.prog === 'scans' ? vScans() : vPhotos()); }
 
 // ---------- TODAY ----------
 function vToday() {
@@ -548,13 +552,123 @@ function fallbackPick() {
   f.click();
 }
 
+
+// ---------- WEIGHT + SCANS ----------
+const weightDays = () => Object.keys(S.days).filter(d => S.days[d].weight != null).sort();
+const baseline = () => { const w = weightDays(); return w.length ? S.days[w[0]].weight : 85; };
+function targetLine() {
+  const base = baseline(); const rows = []; let sun = LINE_START, target = base;
+  for (let k = 1; k <= WEEKS; k++) {
+    if (k > 1 && !HOLD_SUNDAYS.includes(sun)) target = target > 75 ? Math.max(75, target - 0.75) : Math.max(72.5, target - 0.5);
+    rows.push({k, sun, target: Math.round(target * 10) / 10, hold: HOLD_SUNDAYS.includes(sun)});
+    sun = addDays(sun, 7);
+  }
+  return rows;
+}
+function chartSvg(series, opts) {
+  // series: [{pts:[[x,y]], color, dash}], x = day number, y = value
+  const W = 340, Hh = 170, pl = 34, pr = 8, pt = 10, pb = 22;
+  const all = series.flatMap(s => s.pts); if (!all.length) return '';
+  let x0 = Math.min(...all.map(p => p[0])), x1 = Math.max(...all.map(p => p[0])), y0 = Math.min(...all.map(p => p[1])), y1 = Math.max(...all.map(p => p[1]));
+  if (x1 === x0) x1 = x0 + 1; const pad_ = (y1 - y0) * 0.15 || 1; y0 -= pad_; y1 += pad_;
+  const X = x => pl + (x - x0) / (x1 - x0) * (W - pl - pr), Y = y => pt + (1 - (y - y0) / (y1 - y0)) * (Hh - pt - pb);
+  let g = '';
+  for (let i = 0; i <= 3; i++) { const v = y0 + (y1 - y0) * i / 3, yy = Y(v); g += '<line x1="' + pl + '" x2="' + (W - pr) + '" y1="' + yy + '" y2="' + yy + '" stroke="#262a33"/><text x="2" y="' + (yy + 4) + '" fill="#9aa1ad" font-size="10">' + v.toFixed(opts.dec) + '</text>'; }
+  for (const se of series) {
+    const d = se.pts.map((p, i) => (i ? 'L' : 'M') + X(p[0]).toFixed(1) + ' ' + Y(p[1]).toFixed(1)).join(' ');
+    g += '<path d="' + d + '" fill="none" stroke="' + se.color + '" stroke-width="2"' + (se.dash ? ' stroke-dasharray="5 4"' : '') + '/>';
+    if (!se.dash) for (const p of se.pts) g += '<circle cx="' + X(p[0]).toFixed(1) + '" cy="' + Y(p[1]).toFixed(1) + '" r="3.5" fill="' + se.color + '"/>';
+  }
+  return '<svg viewBox="0 0 ' + W + ' ' + Hh + '" width="100%" role="img" aria-label="' + esc(opts.label) + '">' + g + '</svg>';
+}
+function vWeight() {
+  const d = todayISO(), x = S.days[d] || {}, ws = weightDays(), line = targetLine();
+  let h = '<div class="card"><h2>Today</h2><div class="row"><div class="grow"><div class="note">Weight (kg)</div><input type="number" step="0.1" inputmode="decimal" data-chg="weight" value="' + (x.weight == null ? '' : x.weight) + '"></div><div class="grow"><div class="note">Waist (cm)</div><input type="number" step="0.5" inputmode="decimal" data-chg="waist" value="' + (x.waist == null ? '' : x.waist) + '"></div></div><div class="note" style="margin-top:6px">Weigh on Sunday morning, after the toilet, before food, same scale. Waist: at the navel, relaxed, breathing out.</div></div>';
+  const n0 = (s) => Math.round((parse(s) - parse(START)) / 864e5);
+  const actual = ws.map(s => [n0(s), S.days[s].weight]), tgt = line.map(r => [n0(r.sun), r.target]);
+  h += '<div class="card"><h2>Weight against the plan</h2>' + chartSvg([{pts: tgt, color: '#6b7380', dash: true}, {pts: actual, color: '#7cf0b4'}], {dec: 1, label: 'Weight chart'}) + '<div class="note">Dashed line: the plan (0.75 kg a week down to 75, then 0.5 a week to 72.5, holding on the diet-break week). Green: your weigh-ins.</div></div>';
+  const t = todayISO(); let rows = '';
+  for (const r of line) {
+    if (r.sun > addDays(t, 21)) break;
+    const a = S.days[r.sun] && S.days[r.sun].weight, delta = a != null ? Math.round((a - r.target) * 10) / 10 : null;
+    rows += '<div class="ing"><span>' + shortD(r.sun) + (r.hold ? ' <span class="note">break week</span>' : '') + '</span><span>' + r.target.toFixed(1) + ' \u2192 <b>' + (a != null ? a.toFixed(1) : '\u2013') + '</b>' + (delta != null ? ' <span class="' + (Math.abs(delta) <= 1 ? 'done' : 'need') + '">' + (delta > 0 ? '+' : '') + delta + '</span>' : '') + '</span></div>';
+  }
+  h += '<div class="card"><h2>Sundays</h2><div class="note">plan \u2192 your weight</div>' + rows + '</div>';
+  const wl = ws.filter(s => S.days[s].waist != null);
+  if (wl.length) h += '<div class="card"><h2>Waist</h2>' + wl.slice(-6).map(s => '<div class="ing"><span>' + pretty(s) + '</span><b>' + S.days[s].waist + ' cm</b></div>').join('') + '</div>';
+  return h;
+}
+const SCAN_FIELDS = [['w', 'Weight (kg)'], ['bf', 'Body fat (%)'], ['smm', 'Skeletal muscle (kg)'], ['bfm', 'Body fat mass (kg)'], ['vf', 'Visceral fat level'], ['ra', 'Lean right arm (kg)'], ['la', 'Lean left arm (kg)'], ['tr', 'Lean trunk (kg)'], ['rl', 'Lean right leg (kg)'], ['ll', 'Lean left leg (kg)']];
+function vScans() {
+  const list = S.scans.slice().sort((a, b) => a.date.localeCompare(b.date));
+  let h = '<div class="card"><h2>Body-composition scans</h2><p class="note">Once a month, on a real InBody machine (gym, pharmacy or studio) or your own InBody scale. Same machine, same time of day, no training that morning, empty stomach. Type the numbers from the printout here.</p>' + btn('scanadd', 'Add a scan', {}, '') + '</div>';
+  if (!list.length) return h + '<div class="empty">No scans yet.</div>';
+  if (list.length >= 2) {
+    const n0 = s => Math.round((parse(s) - parse(START)) / 864e5);
+    const bf = list.filter(e => e.bf != null).map(e => [n0(e.date), e.bf]), sm = list.filter(e => e.smm != null).map(e => [n0(e.date), e.smm]);
+    if (bf.length > 1) h += '<div class="card"><h2>Body fat %</h2>' + chartSvg([{pts: bf, color: '#ffd27a'}], {dec: 1, label: 'Body fat chart'}) + '</div>';
+    if (sm.length > 1) h += '<div class="card"><h2>Skeletal muscle (kg)</h2>' + chartSvg([{pts: sm, color: '#7cf0b4'}], {dec: 1, label: 'Muscle chart'}) + '</div>';
+  }
+  const rev = list.slice().reverse();
+  rev.forEach((e, i) => {
+    const prev = rev[i + 1], dl = (k) => (prev && e[k] != null && prev[k] != null) ? ' <span class="note">(' + (e[k] - prev[k] > 0 ? '+' : '') + Math.round((e[k] - prev[k]) * 10) / 10 + ')</span>' : '';
+    h += '<div class="card"><div class="row"><div class="t grow">' + pretty(e.date) + '</div>' + btn('scandel', '\u00d7', {date: e.date}, 'sec sm') + '</div>' + (e.src ? '<div class="note">' + esc(e.src) + '</div>' : '');
+    for (const [k, l] of SCAN_FIELDS) if (e[k] != null) h += '<div class="ing"><span>' + l + '</span><b>' + e[k] + dl(k) + '</b></div>';
+    h += '</div>';
+  });
+  return h;
+}
+function openScan() {
+  let h = '<h2>Add a scan</h2><div class="note">Date</div><input type="text" id="sd" value="' + todayISO() + '"><div class="note" style="margin-top:8px">Where / which machine (optional)</div><input type="text" id="ss" placeholder="e.g. InBody 270 at the gym">';
+  for (const [k, l] of SCAN_FIELDS) h += '<div class="note" style="margin-top:8px">' + l + '</div><input type="number" step="0.1" inputmode="decimal" id="sc_' + k + '">';
+  sheet(h + '<div class="row" style="margin-top:12px;flex-wrap:wrap">' + btn('scango', 'Save scan', {}, '') + btn('closesheet', 'Cancel', {}, 'sec') + '</div>');
+}
+async function saveScan() {
+  const date = $('#sd').value.trim(); if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return toast('Date must look like 2026-11-01', true);
+  const e = {date, src: $('#ss').value.trim()}; let any = false;
+  for (const [k] of SCAN_FIELDS) { const v = parseFloat($('#sc_' + k).value); if (!isNaN(v)) { e[k] = v; any = true; } }
+  if (!any) return toast('Enter at least one number', true);
+  S.scans = S.scans.filter(x => x.date !== date).concat([e]); await saveScans(); closeSheet(); toast('Scan saved'); render();
+}
+
+// ---------- SEND TO CLAUDE ----------
+function snapshot() {
+  const t = todayISO(), idx = dayIndex(t), L = [], avg = a => a.length ? a.reduce((x, y) => x + y, 0) / a.length : null;
+  L.push('ROUTINE SNAPSHOT ' + t + ' (day ' + idx + ' of ' + (Math.round((parse(END) - parse(START)) / 864e5) + 1) + ')');
+  let pat = ''; for (let i = 13; i >= 0; i--) { const d = addDays(t, -i); pat += dayIndex(d) < 1 ? '.' : (isCore(d) ? 'X' : (coreCount(d) > 0 ? 'o' : '-')); }
+  L.push('Core streak: ' + streak() + ' days. Last 14 days (old to new, X = all 4 core done, o = partial, - = none, . = before start): ' + pat);
+  const td = S.days[t] || {}; L.push('Today so far: morning skin ' + (td.am ? 'done' : 'no') + ', evening skin ' + (td.pm ? 'done' : 'no') + ', SPF ' + (td.spf ? 'done' : 'no') + ', posture A ' + (td.pA ? 'done' : 'no') + ', posture B ' + (td.pB ? 'done' : 'no'));
+  const last7 = Array.from({length: 7}, (_, i) => addDays(t, -i));
+  const steps = last7.map(d => (S.days[d] || {}).steps).filter(v => v != null), walks = last7.map(d => (S.days[d] || {}).walks).filter(v => v != null);
+  L.push('Steps, last 7 days: ' + (steps.length ? 'average ' + r0(avg(steps)) + ' over ' + steps.length + ' logged days (target 10000)' : 'none logged') + (walks.length ? '; walks per day average ' + r1(avg(walks)) : ''));
+  L.push('Water 3 l ticked ' + last7.filter(d => (S.days[d] || {}).water).length + '/7 days, slept 7 h ' + last7.filter(d => (S.days[d] || {}).sleep).length + '/7 days, sessions done ' + last7.filter(d => (S.days[d] || {}).sess).length + '/7');
+  const ld = last7.filter(d => logsFor(d).length), tot = ld.map(d => totals(d));
+  L.push('Food, last 7 days: ' + (ld.length ? 'logged on ' + ld.length + ' days; average ' + r0(avg(tot.map(x => x.k))) + ' kcal, ' + r0(avg(tot.map(x => x.p))) + ' g protein, ' + r0(avg(tot.map(x => x.c))) + ' g carbs, ' + r0(avg(tot.map(x => x.f))) + ' g fat (targets 1850 kcal, 180 g protein)' : 'nothing logged'));
+  const ws = weightDays();
+  if (ws.length) {
+    const line = targetLine(), cur = line.filter(r => r.sun <= t).pop() || line[0], lw = ws[ws.length - 1];
+    L.push('Weights (kg): ' + ws.slice(-8).map(d => d.slice(5) + ' ' + S.days[d].weight).join(', ') + '. Baseline ' + baseline() + '. Plan target this week ' + cur.target.toFixed(1) + ' (latest ' + S.days[lw].weight + ', ' + (Math.round((S.days[lw].weight - cur.target) * 10) / 10) + ' vs plan)');
+  } else L.push('Weights: none yet');
+  const wl = ws.filter(d => S.days[d].waist != null); L.push('Waist (cm): ' + (wl.length ? wl.slice(-5).map(d => d.slice(5) + ' ' + S.days[d].waist).join(', ') : 'none yet'));
+  const sc = S.scans.slice().sort((a, b) => a.date.localeCompare(b.date)).slice(-3);
+  L.push('Scans: ' + (sc.length ? sc.map(e => e.date + (e.src ? ' (' + e.src + ')' : '') + ' ' + SCAN_FIELDS.filter(([k]) => e[k] != null).map(([k, l]) => l.replace(/ \(.*\)/, '') + ' ' + e[k]).join(', ')).join(' | ') : 'none yet'));
+  const low = Object.values(S.pantry).filter(p => { const f = foodOf(p.id); return f && f.pack > 1 && !p.custom && p.g < f.pack * 0.15; }).map(p => fname(p.id) + ' ' + r0(p.g) + ' g');
+  L.push('Pantry: ' + Object.keys(S.pantry).length + ' items' + (low.length ? '; low: ' + low.join(', ') : ''));
+  const sh = Object.values(S.shop).filter(e => e.g > 0); L.push('Shopping list: ' + sh.length + ' items' + (sh.length ? ', about EUR ' + sh.reduce((a, e) => a + priceOf(e.id, e.g), 0).toFixed(0) : ''));
+  const pd = [...new Set(S.photos.map(p => p.date))].sort(); L.push('Photos: ' + pd.length + ' days with photos' + (pd.length ? ', last on ' + pd[pd.length - 1] : ''));
+  return L.join('\n');
+}
+function openSnapshot() {
+  sheet('<h2>Send to Claude</h2><p class="note">This is a short text summary of your numbers. No photos, no names. Copy it and paste it into our chat.</p><div class="prompt" id="snaptxt" style="white-space:pre-wrap">' + esc(snapshot()) + '</div><div class="row" style="margin-top:12px;flex-wrap:wrap">' + btn('copysnap', 'Copy it', {}, '') + btn('closesheet', 'Close', {}, 'sec') + '</div>');
+}
+
 // ---------- BACKUP ----------
 function vBackup() {
   const est = ui.est;
   return '<h1>Backup</h1><p class="sub">Everything lives only on this phone</p>' +
     '<div class="card"><div class="t">' + S.photos.length + ' photos' + (est ? ' · ' + est + ' MB used' : '') + '</div><div class="h" style="margin:6px 0 12px">' + (ui.persisted ? 'Storage is protected from being cleared by the phone.' : 'The phone could clear this storage if it runs very low on space. Make a backup now and then.') + '</div>' + btn('zip', 'Save all photos as a ZIP', {}, S.photos.length ? '' : '') + '<div class="note" style="margin-top:8px">Saves to your Downloads. Do this every Sunday.</div></div>' +
     '<div class="card"><div class="t">Meals, pantry, shopping, routine</div><div class="h" style="margin:6px 0 12px">One small file with everything except the photos.</div><div class="row" style="flex-wrap:wrap">' + btn('jsonout', 'Save data file', {}, '') + btn('jsonin', 'Restore from a data file', {}, 'sec') + '</div></div>' +
-    '<div class="card"><div class="t">Privacy</div><div class="h">Nothing is ever uploaded. There is no account and no server. Your photos and data exist only in this app on this phone, plus any file you save yourself.</div></div>';
+    '<div class="card"><div class="t">Send to Claude</div><div class="h" style="margin:6px 0 12px">A short text summary of your streak, food, weight and scans to paste into the chat. No photos.</div>' + btn('snap', 'Make the summary', {}, '') + '</div>' + '<div class="card"><div class="t">Privacy</div><div class="h">Nothing is ever uploaded. There is no account and no server. Your photos and data exist only in this app on this phone, plus any file you save yourself.</div></div>';
 }
 const crcT = (() => { const t = []; for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
 const crc32 = u8 => { let c = 0xFFFFFFFF; for (let i = 0; i < u8.length; i++) c = crcT[(c ^ u8[i]) & 255] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; };
@@ -574,7 +688,7 @@ async function makeZip() {
   download(new Blob([...parts, ...cd, end], {type: 'application/zip'}), 'routine-photos-' + todayISO() + '.zip');
 }
 function exportJSON() {
-  const data = {app: 'routine', version: 2, exported: todayISO(), days: S.days, pantry: S.pantry, shop: S.shop, log: S.log, settings: S.set};
+  const data = {app: 'routine', version: 2, exported: todayISO(), days: S.days, pantry: S.pantry, shop: S.shop, log: S.log, settings: S.set, scans: S.scans};
   download(new Blob([JSON.stringify(data)], {type: 'application/json'}), 'routine-data-' + todayISO() + '.json');
 }
 async function applyImport(d) {
@@ -585,6 +699,7 @@ async function applyImport(d) {
   for (const [k, v] of Object.entries(d.shop || {})) await dbPut('shopping', k, v);
   for (const e of (d.log || [])) { const { key, ...rest } = e; await dbPut('mealLog', key, rest); }
   await dbPut('kv', 'settings', d.settings || {plan: {}, basics: {}});
+  await dbPut('kv', 'scans', d.scans || []);
   await loadAll();
 }
 function importJSON() {
@@ -647,6 +762,11 @@ const H = {
   jsonout() { exportJSON(); },
   jsonin() { importJSON(); },
   closesheet() { closeSheet(); },
+  scanadd() { openScan(); },
+  scango() { return saveScan(); },
+  async scandel(d) { if (!confirm('Delete this scan?')) return; S.scans = S.scans.filter(x => x.date !== d.date); await saveScans(); render(); },
+  snap() { openSnapshot(); },
+  async copysnap() { const ok = await copyText(snapshot()); toast(ok ? 'Copied. Paste it into the chat.' : 'Could not copy. Press and hold the text to copy it.', !ok); },
   fsub(d) { ui.food = d.id; render(); },
   psub(d) { ui.prog = d.id; render(); },
   asub(d) { ui.areas = d.id; render(); },
@@ -672,7 +792,8 @@ document.querySelectorAll('#nav button').forEach(b => b.onclick = () => { ui.mea
 (async () => {
   db = await openDB(); await loadAll();
   try { if (navigator.storage) { if (navigator.storage.persist) await navigator.storage.persist(); ui.persisted = navigator.storage.persisted ? await navigator.storage.persisted() : false; if (navigator.storage.estimate) { const e = await navigator.storage.estimate(); ui.est = (e.usage / 1048576).toFixed(1); } } } catch (e) {}
-  window.__app = {S, ui, PRODUCTS, AREAS, SUPPS, promptOf, sched, applyImport, exportData: () => ({app: 'routine', version: 2, exported: todayISO(), days: S.days, pantry: S.pantry, shop: S.shop, log: S.log, settings: S.set}), show, render, loadAll, RECIPES, FOODS, todayISO, plannedId, missingOf, macros, have, H, get db() { return db; }, dbPut, reloadPhotos, setPantry};
+  window.__app = {S, ui, PRODUCTS, AREAS, SUPPS, promptOf, sched, applyImport, exportData: () => ({app: 'routine', version: 2, exported: todayISO(), days: S.days, pantry: S.pantry, shop: S.shop, log: S.log, settings: S.set, scans: S.scans}),
+    snapshot, targetLine, openScan, saveScan, show, render, loadAll, RECIPES, FOODS, todayISO, plannedId, missingOf, macros, have, H, get db() { return db; }, dbPut, reloadPhotos, setPantry};
   show('today');
   if ('serviceWorker' in navigator) {
     const had = !!navigator.serviceWorker.controller;
