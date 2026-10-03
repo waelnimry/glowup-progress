@@ -44,7 +44,7 @@ const dbEntries = store => new Promise((res, rej) => {
 });
 
 const S = { days: {}, pantry: {}, shop: {}, log: [], set: {plan: {}, basics: {}}, photos: [] };
-const ui = { view: 'today', mealsDate: null, open: {}, pt: 'take', tlSlot: 'face', cmpSlot: 'face' };
+const ui = { view: 'today', mealsDate: null, open: {}, pt: 'take', tlSlot: 'face', cmpSlot: 'face', food: 'pantry', prog: 'photos', areas: 'face' };
 
 async function loadAll() {
   S.days = {}; S.pantry = {}; S.shop = {}; S.log = [];
@@ -135,16 +135,21 @@ function macBars(t) {
 
 // ====================== views ======================
 const root = $('#app');
+const ALIAS = {pantry: ['food', 'pantry'], shop: ['food', 'shop'], photos: ['progress', 'photos'], backup: ['more']};
 function show(v) {
+  if (ALIAS[v]) { const [vv, sub] = ALIAS[v]; if (vv === 'food') ui.food = sub; if (vv === 'progress') ui.prog = sub; v = vv; }
   ui.view = v;
   document.querySelectorAll('#nav button').forEach(b => b.classList.toggle('on', b.dataset.v === v));
   render(); window.scrollTo(0, 0);
 }
 function render() {
-  const fn = {today: vToday, meals: vMeals, pantry: vPantry, shop: vShop, photos: vPhotos, backup: vBackup}[ui.view];
+  const fn = {today: vToday, meals: vMeals, food: vFood, areas: vAreas, progress: vProgress, more: vBackup}[ui.view];
   root.innerHTML = fn();
-  if (ui.view === 'photos' && ui.pt === 'compare') bindCompare();
+  if (ui.view === 'progress' && ui.prog === 'photos' && ui.pt === 'compare') bindCompare();
 }
+const subSeg = (cur, act, items) => '<div class="seg">' + items.map(([k, l]) => '<button data-act="' + act + '" data-id="' + k + '" class="' + (cur === k ? 'on' : '') + '">' + l + '</button>').join('') + '</div>';
+function vFood() { return subSeg(ui.food, 'fsub', [['pantry', 'Pantry'], ['shop', 'Shop']]) + (ui.food === 'shop' ? vShop() : vPantry()); }
+function vProgress() { return subSeg(ui.prog, 'psub', [['photos', 'Photos']]) + vPhotos(); }
 
 // ---------- TODAY ----------
 function vToday() {
@@ -161,8 +166,8 @@ function vToday() {
   h += tick('pB', 'Posture set B', 'Dead bugs 2×10 · glute bridges 2×15 · hip-flexor stretch 30 s each side', x.pB);
   if (sc.wash) h += tick('wash', 'Hair wash day', 'Shampoo on scalp, conditioner on ends, leave-in, gel, plop 10 min', x.wash);
   if (sc.beard) h += tick('beard', 'Beard trim', 'Trimmer at 3–4 mm. No razor', x.beard);
-  h += tick('water', 'Water 2 litres', '', x.water) + tick('sleep', 'Slept 7 hours or more', '', x.sleep);
-  h += '</div>';
+  h += tick('water', 'Water 3 litres', 'Part of the cut plan', x.water) + tick('sleep', 'Slept 7 hours or more', '', x.sleep);
+  h += btn('goareas', 'How to use each product', {}, 'sec sm') + '</div>';
 
   h += '<div class="card"><h2>Training today</h2>' + tick('sess', sc.session, sc.weigh ? 'Weigh in this morning, after the toilet, before food' : '', x.sess) + '</div>';
 
@@ -389,6 +394,59 @@ async function weekFill() {
   toast(n ? n + ' items added for the next 7 days' : 'Your pantry already covers the next 7 days'); render();
 }
 
+
+// ---------- AREAS ----------
+function stripFor(p) {
+  if (p.onDemand) return '<div class="note">Only when a spot needs it.</div>';
+  const t = todayISO(); let h = '<div class="wk">';
+  for (let i = 0; i < 7; i++) { const d = addDays(t, i), wd = parse(d).getDay(), on = p.days(sched(d), wd); h += '<div class="' + (on ? 'y' : '') + (i === 0 ? ' today' : '') + '">' + WD[wd].slice(0, 2) + '<br>' + (on ? '\u2713' : '\u2013') + '</div>'; }
+  return h + '</div>';
+}
+const promptOf = p => PROMPT_BASE + 'he is ' + p.act + PROMPT_END;
+function prodCard(id) {
+  const p = PRODUCTS[id], open = ui.open['p:' + id], d = todayISO(), on = !p.onDemand && p.days(sched(d), parse(d).getDay());
+  let h = '<div class="card"><button class="tick" style="margin:0;border:0;background:transparent;padding:0" data-act="prodopen" data-id="' + id + '"><span class="grow"><div class="t">' + esc(p.short) + '</div><div class="h">' + esc(p.when) + '</div></span>' + (p.onDemand ? chip('as needed') : (on ? chip('Use today', 'ok') : chip('Not today', ''))) + '</button>';
+  if (open) {
+    h += '<div class="sec-t">This week</div>' + stripFor(p);
+    h += '<div class="sec-t">How to use it</div><ol class="st">' + p.steps.map(x => '<li>' + esc(x) + '</li>').join('') + '</ol>';
+    h += '<div class="sec-t">When NOT to use it</div><ul class="st" style="list-style:disc">' + p.skip.map(x => '<li>' + esc(x) + '</li>').join('') + '</ul>';
+    h += '<div class="sec-t">Buy it</div><div class="note">' + esc(p.n) + (p.price ? ' \u00b7 ~\u20ac' + p.price.toFixed(2) + ' (' + esc(p.priceNote) + ')' : ' \u00b7 ' + esc(p.priceNote)) + (p.where ? ' \u00b7 ' + esc(p.where) : '') + '</div>';
+    if (p.url) h += '<a class="lnk" target="_blank" rel="noopener" href="' + esc(p.url) + '">Open the product page</a><br>';
+    h += '<a class="lnk" target="_blank" rel="noopener" href="https://www.youtube.com/results?search_query=' + encodeURIComponent(p.search) + '">\u25b6 Search videos on how to do it</a>';
+    h += '<div class="sec-t">Picture prompt</div><div class="note">Paste this into any image generator to see the technique on a real-looking person. Use the steps above as the truth: AI pictures often get hands and amounts wrong.</div><div class="prompt">' + esc(promptOf(p)) + '</div>' + btn('copyprompt', 'Copy prompt', {id}, 'sec sm');
+  }
+  return h + '</div>';
+}
+function areaCard(a) {
+  const open = ui.open['a:' + a.id];
+  let h = '<div class="card"><button class="tick" style="margin:0;border:0;background:transparent;padding:0" data-act="areaopen" data-id="' + a.id + '"><span class="grow"><div class="t">' + esc(a.n) + '</div><div class="h">' + esc(a.goal) + '</div></span><span class="note">' + (open ? '\u2212' : '+') + '</span></button>';
+  if (open) {
+    h += '<div class="sec-t">Where you are</div><div class="note">' + esc(a.now) + '</div>';
+    h += '<div class="sec-t">What actually moves it</div><ul class="st" style="list-style:disc">' + a.moves.map(x => '<li>' + esc(x) + '</li>').join('') + '</ul>';
+    if (a.products.length) {
+      h += '<div class="sec-t">Products</div>';
+      for (const id of a.products) { const p = PRODUCTS[id]; h += '<div class="ing" style="align-items:center"><span class="grow">' + esc(p.short) + '<div class="note">' + (p.price ? '~\u20ac' + p.price.toFixed(2) + ' \u00b7 ' : '') + esc(p.when) + '</div></span>' + btn('gotoprod', 'How', {id}, 'sec sm') + '</div>'; }
+    }
+    if (a.cant) h += '<div class="sec-t">What will not change</div><div class="note">' + esc(a.cant) + '</div>';
+  }
+  return h + '</div>';
+}
+function vAreas() {
+  let h = '<h1>Areas</h1><p class="sub">Every part of the face and body: where it is, what moves it, and what to buy</p>' + subSeg(ui.areas, 'asub', [['face', 'Face'], ['body', 'Body'], ['products', 'Products'], ['vitamins', 'Vitamins']]);
+  if (ui.areas === 'face' || ui.areas === 'body') h += AREAS.filter(a => a.group.toLowerCase() === ui.areas).map(areaCard).join('');
+  else if (ui.areas === 'products') {
+    let total = 0; for (const id of PRODUCT_ORDER) total += PRODUCTS[id].price || 0;
+    h += '<p class="note">All ' + PRODUCT_ORDER.length + ' products you use, with the days. Total if you bought everything new: about \u20ac' + total.toFixed(0) + '.</p>' + PRODUCT_ORDER.map(prodCard).join('');
+  } else {
+    h += '<p class="note">What the evidence supports for health and skin. Nothing here is started without the Hausarzt visit.</p>' + SUPPS.map(x => '<div class="card"><div class="row"><div class="t grow">' + esc(x.n) + '</div>' + chip(esc(x.status), x.status === 'No' ? 'no' : (x.status === 'Optional' ? '' : 'dn')) + '</div><div class="note" style="margin-top:6px">' + esc(x.text) + '</div></div>').join('');
+  }
+  return h;
+}
+function copyText(t) {
+  if (navigator.clipboard && navigator.clipboard.writeText) return navigator.clipboard.writeText(t).then(() => true).catch(() => false);
+  const ta = document.createElement('textarea'); ta.value = t; document.body.appendChild(ta); ta.select(); let ok = false; try { ok = document.execCommand('copy'); } catch (e) {} ta.remove(); return Promise.resolve(ok);
+}
+
 // ---------- PHOTOS ----------
 const SLOT_PHOTOS = [
   {id: 'face', label: 'Face', facing: 'user', hint: 'Straight on, neutral face, hair back, same light every day'},
@@ -404,7 +462,7 @@ const segHtml = (cur, act) => '<div class="seg">' + SLOT_PHOTOS.map(s => '<butto
 
 function vPhotos() {
   const sub = '<div class="seg">' + [['take', 'Take'], ['timeline', 'Timeline'], ['compare', 'Compare']].map(([k, l]) => '<button data-act="pt" data-id="' + k + '" class="' + (ui.pt === k ? 'on' : '') + '">' + l + '</button>').join('') + '</div>';
-  let h = '<h1>Photos</h1>' + sub;
+  let h = sub;
   if (ui.pt === 'take') {
     const d = todayISO();
     for (const s of SLOT_PHOTOS) {
@@ -589,6 +647,14 @@ const H = {
   jsonout() { exportJSON(); },
   jsonin() { importJSON(); },
   closesheet() { closeSheet(); },
+  fsub(d) { ui.food = d.id; render(); },
+  psub(d) { ui.prog = d.id; render(); },
+  asub(d) { ui.areas = d.id; render(); },
+  goareas() { ui.areas = 'products'; show('areas'); },
+  prodopen(d) { ui.open['p:' + d.id] = !ui.open['p:' + d.id]; render(); },
+  areaopen(d) { ui.open['a:' + d.id] = !ui.open['a:' + d.id]; render(); },
+  gotoprod(d) { ui.areas = 'products'; ui.open['p:' + d.id] = true; show('areas'); },
+  async copyprompt(d) { const ok = await copyText(promptOf(PRODUCTS[d.id])); toast(ok ? 'Prompt copied' : 'Could not copy. Press and hold the text to copy it.', !ok); },
   sheetbg(d, el, ev) { if (ev.target === el) closeSheet(); }
 };
 document.addEventListener('click', e => {
@@ -606,7 +672,7 @@ document.querySelectorAll('#nav button').forEach(b => b.onclick = () => { ui.mea
 (async () => {
   db = await openDB(); await loadAll();
   try { if (navigator.storage) { if (navigator.storage.persist) await navigator.storage.persist(); ui.persisted = navigator.storage.persisted ? await navigator.storage.persisted() : false; if (navigator.storage.estimate) { const e = await navigator.storage.estimate(); ui.est = (e.usage / 1048576).toFixed(1); } } } catch (e) {}
-  window.__app = {S, ui, applyImport, exportData: () => ({app: 'routine', version: 2, exported: todayISO(), days: S.days, pantry: S.pantry, shop: S.shop, log: S.log, settings: S.set}), show, render, loadAll, RECIPES, FOODS, todayISO, plannedId, missingOf, macros, have, H, get db() { return db; }, dbPut, reloadPhotos, setPantry};
+  window.__app = {S, ui, PRODUCTS, AREAS, SUPPS, promptOf, sched, applyImport, exportData: () => ({app: 'routine', version: 2, exported: todayISO(), days: S.days, pantry: S.pantry, shop: S.shop, log: S.log, settings: S.set}), show, render, loadAll, RECIPES, FOODS, todayISO, plannedId, missingOf, macros, have, H, get db() { return db; }, dbPut, reloadPhotos, setPantry};
   show('today');
   if ('serviceWorker' in navigator) {
     const had = !!navigator.serviceWorker.controller;

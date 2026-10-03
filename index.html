@@ -70,6 +70,12 @@ ol.st li{margin:5px 0}
 .cmp .top{clip-path:inset(0 50% 0 0)}
 .cmp .line{position:absolute;top:0;bottom:0;width:2px;background:var(--acc);left:50%}
 .cmp .lab{position:absolute;top:8px;font-size:12px;background:#000a;padding:2px 8px;border-radius:8px}
+.prompt{background:#0b0d11;border:1px solid var(--line);border-radius:10px;padding:10px;font-size:13px;color:#cfd3da;line-height:1.45;margin:6px 0}
+.wk{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin:8px 0}
+.wk div{text-align:center;background:#14171d;border:1px solid var(--line);border-radius:8px;padding:5px 0;font-size:12px}
+.wk .y{background:#16352a;border-color:#25563f;color:var(--acc);font-weight:700}
+.wk .today{outline:2px solid #3d6f57}
+.sec-t{font-weight:700;margin:12px 0 4px;color:#cfd3da}
 .empty{color:var(--mut);text-align:center;padding:36px 10px}
 .hide{display:none!important}
 .note{color:var(--mut);font-size:13px}
@@ -96,10 +102,10 @@ ol.st li{margin:5px 0}
 <nav id="nav">
   <button data-v="today" class="on">Today</button>
   <button data-v="meals">Meals</button>
-  <button data-v="pantry">Pantry</button>
-  <button data-v="shop">Shop</button>
-  <button data-v="photos">Photos</button>
-  <button data-v="backup">Backup</button>
+  <button data-v="food">Food</button>
+  <button data-v="areas">Areas</button>
+  <button data-v="progress">Progress</button>
+  <button data-v="more">More</button>
 </nav>
 
 <div id="cam" class="hide">
@@ -124,6 +130,7 @@ ol.st li{margin:5px 0}
 
 <script src="foods.js"></script>
 <script src="meals.js"></script>
+<script src="areas.js"></script>
 <script src="app.js"></script>
 </body>
 </html>
