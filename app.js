@@ -424,20 +424,34 @@ function picsRow(id) {
   const box = (src, label) => src ? '<div style="background-image:url(' + esc(src) + ')"></div>' : '<div>' + label + '<br>(picture not added yet)</div>';
   return '<div class="pics">' + box(pc.p, 'The product') + box(pc.m, 'How to use it') + '</div>';
 }
+const stepDef = id => STEP_PICS[id] && STEP_PICS[id].same ? STEP_PICS[STEP_PICS[id].same] : STEP_PICS[id];
+const promptStep = (id, n) => { const d = STEP_PICS[id]; return STEP_PREFIX + 'Picture ' + n + ' of 4 in a step-by-step guide on how to use ' + d.look + '. In this picture he is ' + d.steps[n - 1][1] + '.' + STEP_END; };
 function vPrompts() {
   const done = S.set.picsDone || {};
-  let h = btn('go', '\u2190 Back', {v: 'more'}, 'sec sm') + '<h1 style="margin-top:12px">Picture prompts</h1><p class="sub">16 prompts for the Gemini app: the man, then one picture of him using each product. Free.</p>';
-  h += '<div class="card"><h2>How to do it</h2><ol class="st"><li>Open the <b>Gemini</b> app and start a new chat.</li><li>Copy prompt <b>#0</b>, paste it, send it. Save the picture of the man. If you do not like him, ask again.</li><li>For <b>#1 to #15</b>: tap <b>+</b>, attach that saved picture of the man, then paste the prompt. This keeps the same man in every picture.</li><li>Send the pictures to me in our chat with their number, five at a time. I check them and put them into the app.</li><li>The product photos are real photos: five are already in, and for the rest use \u201cUse my own photo\u201d on the product card when you buy it.</li></ol></div>';
-  const row = (key, label, text) => '<div class="card"><div class="row"><div class="grow"><span class="pnum">' + key + '</span><b>' + esc(label) + '</b></div>' + btn('picdone', done[key] ? '\u2713 Done' : 'Mark done', {key}, done[key] ? '' : 'sec sm') + '</div><div class="prompt">' + esc(text) + '</div>' + btn('copypic', 'Copy prompt', {key}, 'sec sm') + '</div>';
-  h += row('#0', 'The man (make this first)', MAN_REF_PROMPT);
-  PICS_ORDER.forEach((id, i) => { h += row('#' + (i + 1), PRODUCTS[id].short + ' (attach #0)', promptMan(id)); });
+  let h = btn('go', '\u2190 Back', {v: 'more'}, 'sec sm') + '<h1 style="margin-top:12px">Picture prompts</h1><p class="sub">4 pictures per product, made in the free Gemini app. Start with batch 1.</p>';
+  h += '<div class="card"><h2>How to do it</h2><ol class="st"><li>You need the picture of the man once (prompt <b>#0</b>). If you already have him, skip it.</li><li>For each product, start a <b>new chat</b> in Gemini. Tap <b>+</b>, attach the man, paste prompt <b>1</b>, send.</li><li>In the <b>same chat</b>, paste prompts <b>2</b>, <b>3</b> and <b>4</b> one by one. No need to attach the man again.</li><li>Tap each picture, tap <b>Download</b>, then share it from your gallery to <b>Drive \u203a Claude</b>. Make them in order 1, 2, 3, 4.</li><li>Tap <b>Mark done</b> on the product, then tell me. I check the pictures and put them into the app.</li></ol></div>';
+  h += '<div class="card"><div class="row"><div class="grow"><span class="pnum">#0</span><b>The man (only once)</b></div>' + btn('picdone', done['#0'] ? '\u2713 Done' : 'Mark done', {key: '#0'}, done['#0'] ? '' : 'sec sm') + '</div><div class="prompt">' + esc(MAN_REF_PROMPT) + '</div>' + btn('copypic', 'Copy prompt', {key: '#0'}, 'sec sm') + '</div>';
+  for (const [title, ids] of STEP_BATCHES) {
+    h += '<div class="sec-t">' + esc(title) + '</div>';
+    for (const id of ids) {
+      const open = ui.open['sp:' + id], d = STEP_PICS[id], have = ((PICS[id] || {}).steps || []).length === 4;
+      h += '<div class="card"><button class="tick" style="margin:0;border:0;background:transparent;padding:0" data-act="spopen" data-id="' + id + '"><span class="grow"><div class="t">' + esc(PRODUCTS[id].short) + '</div><div class="h">' + esc(d.steps.map((x, i) => (i + 1) + '. ' + x[0]).join(' \u00b7 ')) + '</div></span>' + (have ? chip('In the app', 'ok') : done[id] ? chip('Sent', '') : chip('To make', '')) + '</button>';
+      if (open) {
+        for (let n = 1; n <= 4; n++) h += '<div style="margin-top:10px"><span class="pnum">' + n + '</span><b>' + esc(d.steps[n - 1][0]) + '</b><div class="prompt">' + esc(promptStep(id, n)) + '</div>' + btn('copypic', 'Copy prompt ' + n, {key: id + '-' + n}, 'sec sm') + '</div>';
+        h += '<div class="row" style="margin-top:10px">' + btn('picdone', done[id] ? '\u2713 Done' : 'Mark done', {key: id}, done[id] ? '' : 'sec sm') + '</div>';
+      }
+      h += '</div>';
+    }
+  }
   return h;
 }
 function promptByKey(key) {
   if (key === '#0') return MAN_REF_PROMPT;
-  return promptMan(PICS_ORDER[Number(key.slice(1)) - 1]);
+  const m = /^([a-z]+)-([1-4])$/.exec(key); if (!m || !STEP_PICS[m[1]] || !STEP_PICS[m[1]].steps) return '';
+  return promptStep(m[1], Number(m[2]));
 }
 function stripFor(p) {
+  if (p.rx) return '<div class="note">Starts once the doctor has prescribed it. The days will follow what the doctor says.</div>';
   if (p.onDemand) return '<div class="note">Only when a spot needs it.</div>';
   const t = todayISO(); let h = '<div class="wk">';
   for (let i = 0; i < 7; i++) { const d = addDays(t, i), wd = parse(d).getDay(), on = p.days(sched(d), wd); h += '<div class="' + (on ? 'y' : '') + (i === 0 ? ' today' : '') + '">' + WD[wd].slice(0, 2) + '<br>' + (on ? '\u2713' : '\u2013') + '</div>'; }
@@ -447,20 +461,25 @@ const promptOf = p => PROMPT_BASE + 'he is ' + p.act + PROMPT_END;
 const prodUrls = new Map();
 function ownUrl(id) { const b = S.prod[id]; if (!b) return null; if (!prodUrls.has(id)) prodUrls.set(id, URL.createObjectURL(b)); return prodUrls.get(id); }
 function picPair(id) {
-  const pc = PICS[id] || {}, own = ownUrl(id), n = PICS_ORDER.indexOf(id) + 1, src = own || pc.p;
-  let left = '<div><div class="tile prod">' + (src ? '<img alt="Product" src="' + esc(src) + '">' : '<span style="color:#666">No product photo yet</span>') + '</div><div class="cap">' + (own ? 'Your photo' : (pc.p ? esc(pc.credit || '') : 'Take one when you buy it')) + '</div>' +
-    '<div class="row" style="margin-top:6px;flex-wrap:wrap;gap:6px">' + btn('ownpic', own ? 'Change my photo' : 'Use my own photo', {id}, 'sec sm') + (own ? btn('ownpicdel', 'Remove', {id}, 'sec sm') : '') + '</div></div>';
-  let right = '<div><div class="tile man">' + (pc.m ? '<img alt="How to use it" src="' + esc(pc.m) + '">' : '<span>Picture #' + n + '<br>not made yet</span>') + '</div><div class="cap">' + (pc.m ? 'How to use it' : 'More \u203a Picture prompts') + '</div></div>';
-  return '<div class="pair">' + left + right + '</div>' + (pc.note && !own ? '<div class="note">' + esc(pc.note) + '</div>' : '');
+  const pc = PICS[id] || {}, own = ownUrl(id), src = own || pc.p;
+  return '<div class="prow"><div class="tile prod thumb">' + (src ? '<img alt="Product" src="' + esc(src) + '">' : '<span style="color:#666;font-size:11px">No product photo yet</span>') + '</div><div class="grow"><div class="cap">' + (own ? 'Your photo' : (pc.p ? esc(pc.credit || '') : 'Take one when you buy it')) + '</div>' +
+    (pc.note && !own ? '<div class="note">' + esc(pc.note) + '</div>' : '') +
+    '<div class="row" style="margin-top:6px;flex-wrap:wrap;gap:6px">' + btn('ownpic', own ? 'Change my photo' : 'Use my own photo', {id}, 'sec sm') + (own ? btn('ownpicdel', 'Remove', {id}, 'sec sm') : '') + '</div></div></div>';
+}
+function stepGrid(id) {
+  const d = stepDef(id); if (!d) return '';
+  const src = STEP_PICS[id].same || id, imgs = (PICS[src] || {}).steps || [];
+  if (imgs.length !== 4) return '<div class="sec-t">In 4 steps</div><ol class="st">' + d.steps.map(x => '<li>' + esc(x[0]) + '</li>').join('') + '</ol><div class="note">Pictures for these steps: More \u203a Picture prompts.</div>';
+  return '<div class="sec-t">In 4 steps</div><div class="steps">' + d.steps.map((x, i) => '<div class="stp"><div class="tile man"><img alt="Step ' + (i + 1) + '" src="' + esc(imgs[i]) + '" loading="lazy"><b class="badge">' + (i + 1) + '</b></div><div class="scap">' + esc(x[0]) + '</div></div>').join('') + '</div>';
 }
 const usingMine = id => !!(S.mine[id] && S.mine[id].use);
 const pname = id => usingMine(id) ? S.mine[id].n : PRODUCTS[id].n;
 function prodCard(id) {
   const p = PRODUCTS[id], open = ui.open['p:' + id], how = ui.open['h:' + id], d = todayISO(), on = !p.onDemand && p.days(sched(d), parse(d).getDay()), ci = CARD_INFO[id] || {};
-  let h = '<div class="card"><button class="tick" style="margin:0;border:0;background:transparent;padding:0" data-act="prodopen" data-id="' + id + '"><span class="grow"><div class="t">' + esc(p.short) + '</div><div class="h">' + (usingMine(id) ? '\u2713 Yours: ' : '') + esc(pname(id)) + '</div></span>' + (p.onDemand ? chip('as needed') : (on ? chip('Use today', 'ok') : chip('Not today', ''))) + '</button>';
+  let h = '<div class="card"><button class="tick" style="margin:0;border:0;background:transparent;padding:0" data-act="prodopen" data-id="' + id + '"><span class="grow"><div class="t">' + esc(p.short) + '</div><div class="h">' + (usingMine(id) ? '\u2713 Yours: ' : '') + esc(pname(id)) + '</div></span>' + (p.rx ? chip('After the doctor') : p.onDemand ? chip('as needed') : (on ? chip('Use today', 'ok') : chip('Not today', ''))) + '</button>';
   if (open) {
     h += usingMine(id) ? '<div class="price">Your own product <span class="note">(you already have it)</span></div>' : '<div class="price">' + esc(p.where ? p.where.split(/[.(]/)[0].trim() : '') + (p.price ? ' \u00b7 ~' + p.price.toFixed(2) + ' EUR' : '') + ' <span class="note">(' + esc(p.priceNote) + ')</span></div>';
-    if (PICS_TEXT[id]) h += picPair(id);
+    h += picPair(id) + stepGrid(id);
     h += cmpBlock(id);
     h += '<div class="info"><div class="lab">WHEN</div><div>' + esc(p.when) + '</div><div class="lab">HOW</div><div>' + esc(ci.how || '') + '</div><div class="lab">ORDER</div><div>' + esc(ci.order || '') + '</div><div class="lab">CAREFUL</div><div><b>' + esc(p.skip[0]) + '</b></div></div>';
     h += btn('howopen', (how ? '\u25bc' : '\u25b6') + ' How to use it', {id}, 'ghost');
@@ -887,9 +906,8 @@ let lastCmp = null;
 function cmpBlock(id) {
   const m = S.mine[id];
   if (!m) return '<div class="row" style="margin:8px 0;flex-wrap:wrap;gap:8px">' + btn('cmpone', 'Compare with what I have (photo)', {id}, 'sec sm') + '</div>';
-  const v = VERDICT[m.verdict] || VERDICT.equal, own = !PICS_TEXT[id] && m.use ? ownUrl(id) : null;
+  const v = VERDICT[m.verdict] || VERDICT.equal;
   let h = '<div class="info" style="display:block"><div class="lab">YOUR PRODUCT</div><div style="margin:4px 0 6px"><b>' + esc(m.n) + '</b> ' + chip(v[0], v[1]) + '</div>';
-  if (own) h += '<img alt="Your product" src="' + esc(own) + '" style="max-width:120px;border-radius:10px;margin:4px 0">';
   h += '<ul class="st" style="list-style:disc;margin:4px 0">' + (m.why || []).map(x => '<li>' + esc(x) + '</li>').join('') + '</ul>';
   if (m.watch) h += '<div class="note"><b>Watch out:</b> ' + esc(m.watch) + '</div>';
   h += '<div class="note">Checked by the AI on ' + esc(m.date) + ' from your photo' + (m.label ? ' and the ingredient list' : ', without the ingredient list') + '. It is a reading of the label, not a lab test.</div>';
@@ -1089,7 +1107,8 @@ const H = {
     f.click();
   },
   async ownpicdel(d) { await dbDel('kv', 'prod:' + d.id); delete S.prod[d.id]; prodUrls.delete(d.id); render(); },
-  async copypic(d) { const ok = await copyText(promptByKey(d.key)); toast(ok ? 'Prompt ' + d.key + ' copied' : 'Could not copy. Press and hold the text to copy it.', !ok); },
+  spopen(d) { ui.open['sp:' + d.id] = !ui.open['sp:' + d.id]; render(); },
+  async copypic(d) { const ok = await copyText(promptByKey(d.key)); toast(ok ? 'Prompt copied. Paste it in Gemini' : 'Could not copy. Press and hold the text to copy it.', !ok); },
   async picdone(d) { S.set.picsDone = Object.assign({}, S.set.picsDone, {[d.key]: !(S.set.picsDone || {})[d.key]}); await saveSet(); render(); },
   scanadd() { openScan(); },
   scango() { return saveScan(); },
@@ -1121,7 +1140,7 @@ document.querySelectorAll('#nav button').forEach(b => b.onclick = () => { ui.mea
 (async () => {
   db = await openDB(); await loadAll();
   try { if (navigator.storage) { if (navigator.storage.persist) await navigator.storage.persist(); ui.persisted = navigator.storage.persisted ? await navigator.storage.persisted() : false; if (navigator.storage.estimate) { const e = await navigator.storage.estimate(); ui.est = (e.usage / 1048576).toFixed(1); } } } catch (e) {}
-  window.__app = {S, ui, dbDel, openChange, handleFoodPhoto, promptByKey, prodUrls, promptMan, promptProd, PRODUCTS, AREAS, SUPPS, promptOf, sched, applyImport, exportData: () => ({app: 'routine', version: 2, exported: todayISO(), days: S.days, pantry: S.pantry, shop: S.shop, log: S.log, settings: S.set, scans: S.scans, myFoods: S.myFoods, myRecipes: S.myRecipes, mine: S.mine}),
+  window.__app = {S, ui, promptStep, stepDef, dbDel, openChange, handleFoodPhoto, promptByKey, prodUrls, promptMan, promptProd, PRODUCTS, AREAS, SUPPS, promptOf, sched, applyImport, exportData: () => ({app: 'routine', version: 2, exported: todayISO(), days: S.days, pantry: S.pantry, shop: S.shop, log: S.log, settings: S.set, scans: S.scans, myFoods: S.myFoods, myRecipes: S.myRecipes, mine: S.mine}),
     handleProdPhoto, saveCmp, setMineUse, get lastCmp() { return lastCmp; },
     aiRecipe, offLookup, upsertMyFood, saveAIRecipe, get lastAI() { return lastAI; }, set lastAI(v) { lastAI = v; },
     snapshot, targetLine, openScan, saveScan, show, render, loadAll, RECIPES, FOODS, todayISO, plannedId, missingOf, macros, have, H, get db() { return db; }, dbPut, reloadPhotos, setPantry};

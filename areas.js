@@ -25,6 +25,11 @@ const PRODUCTS = {
     steps: ['Wash your face with the cleanser and wait until the skin is completely dry.', 'Squeeze out about a pea-sized amount for the whole of both cheeks and the jaw.', 'Dot it on the cheeks and jaw only and spread it as a thin, almost invisible layer.', 'Wash your hands straight away.', 'Wait 10 minutes, then put on the moisturiser.'],
     skip: ['Never on eyes, lips, nostrils or broken skin.', 'Skip the night and use it only 2 times a week if the skin burns, peels hard or swells. If it keeps happening, stop and tell me.', 'No new acne product on the same night as this one, until we have talked about it.', 'It bleaches fabric: use an old white pillowcase and a towel you do not mind ruining.', 'Do not use it on a sunburn.'],
     search: 'how to apply benzoyl peroxide gel acne correctly', act: 'dabbing a thin layer of clear acne gel onto his cheek with a fingertip, other hand holding the tube'},
+  adapalene: {n: 'Adapalene 0.1 % gel (for example Differin), from the doctor', short: 'Adapalene (gel from the doctor)', price: 5, priceNote: 'est: the usual prescription fee, not checked', where: 'Pharmacy, with a prescription from the Hausarzt or a skin doctor', url: '',
+    when: 'Evenings, only once the doctor has prescribed it. Usually every second night at the start', days: () => false, rx: true,
+    steps: ['Wash your face with the cleanser and pat it dry.', 'Wait until your skin is completely dry (about 20 minutes).', 'Take ONE pea-sized amount for the whole face.', 'Dot it on your forehead, both cheeks and chin, then spread it into a thin layer.', 'Keep it away from your eyes, lips and the corners of your nose.', 'Moisturiser on top after a few minutes.'],
+    skip: ['Never more than a pea-sized amount for the whole face. More does not work better, it only irritates.', 'Ask the doctor how to combine it with Benzaknen: same night, or alternate nights.', 'Sun cream every morning is a must while you use it.', 'Dry, slightly red skin in the first 2 to 4 weeks is normal. Burning or swelling: stop and call the doctor.'],
+    search: 'how to apply adapalene gel pea sized amount', act: 'spreading a thin layer of white gel over his cheek with two fingertips in the evening'},
   shampoo: {n: 'Balea Shampoo Locken beauty essentials, 400 ml', short: 'Curl shampoo', price: 2.45, priceNote: 'checked 19 Sep', where: 'dm', url: 'https://www.dm.de/p/d/3155276/balea-shampoo-locken-beauty-essentials',
     when: 'Wash days: Monday, Thursday, Saturday', days: s => s.wash,
     steps: ['Wet your hair fully with warm water.', 'Put a small amount in your palm and spread it on your scalp only.', 'Massage the scalp with your fingertips for one minute. Do not scrub the lengths.', 'Rinse. The suds running down are enough to clean the ends.'],
@@ -103,6 +108,7 @@ const PRODUCT_ROLE = {
   moist: 'a light face moisturiser for oily, acne-prone skin: non-comedogenic, little or no fragrance; ceramides or niacinamide are a plus. Used morning and evening, also after benzoyl peroxide',
   spf: 'a daily face sunscreen, SPF 50 with good UVA protection, light or matte, non-comedogenic, made for oily or acne-prone skin',
   bpo: 'an acne treatment with benzoyl peroxide 2.5 to 5 %',
+  adapalene: 'a prescription retinoid gel for acne: adapalene 0.1 % or what the doctor prescribed',
   shampoo: 'a gentle, preferably sulfate-free shampoo for curly hair',
   cond: 'a conditioner for curly hair that detangles and softens',
   leavein: 'a leave-in conditioner or curl cream for curly hair against frizz',
@@ -120,13 +126,13 @@ const PRODUCT_ROLE = {
 };
 
 // Order shown in the Products list
-const PRODUCT_ORDER = ['cleanser', 'moist', 'spf', 'bpo', 'shampoo', 'cond', 'leavein', 'gel', 'towel', 'trimmer', 'toothbrush', 'toothpaste', 'floss', 'scraper', 'lipbalm', 'bodywash', 'deo', 'bodylotion'];
+const PRODUCT_ORDER = ['cleanser', 'moist', 'spf', 'bpo', 'adapalene', 'shampoo', 'cond', 'leavein', 'gel', 'towel', 'trimmer', 'toothbrush', 'toothpaste', 'floss', 'scraper', 'lipbalm', 'bodywash', 'deo', 'bodylotion'];
 
 // Face and body areas. now = what the photos/assessment show. moves = what actually changes it. cant = honest limit.
 const AREAS = [
   {id: 'cheeks', group: 'Face', n: 'Cheeks', now: 'Mild-to-moderate acne on the cheeks and jaw, with red and brown marks where spots healed, and some shallow texture.', goal: 'Calmer in 8 to 12 weeks, marks fading over 3 to 6 months.',
    moves: ['Benzaknen on the cheeks and jaw in the evening (the one over-the-counter acne drug with real evidence).', 'SPF 50 every single morning: the marks only fade if the sun does not darken them again.', 'Never pop spots: squeezing pushes it deeper and leaves a mark.', 'Ask the Hausarzt for adapalene gel or a dermatologist referral this week.', 'Losing fat slims the lower face and cheeks too.'],
-   products: ['cleanser', 'moist', 'spf', 'bpo'], cant: 'The shallow texture is a separate dermatology conversation for later. It is not part of this budget.'},
+   products: ['cleanser', 'moist', 'spf', 'bpo', 'adapalene'], cant: 'The shallow texture is a separate dermatology conversation for later. It is not part of this budget.'},
   {id: 'skin', group: 'Face', n: 'Skin overall', now: 'Combination to oily: shine on the nose and inner cheeks, enlarged pores there, drier at the edges.', goal: 'Even, calm skin that is no longer irritated.',
    moves: ['Four products only. More makes irritated skin worse.', 'Sleep 7 hours with a fixed wake-up time.', 'Water through the day and a clean pillowcase, changed weekly.'],
    products: ['cleanser', 'moist', 'spf'], cant: 'Skin type is genetic. The routine controls the oil and irritation, it does not change the type.'},
@@ -222,8 +228,114 @@ const CARD_INFO = {
   leavein:    {how: 'Coin-sized amount on soaking-wet hair, head tipped forward.', order: 'Straight out of the shower, after the conditioner.'},
   gel:        {how: 'Same amount as the leave-in, scrunched upward. Do not touch it while it dries.', order: 'Right after the leave-in.'},
   towel:      {how: 'Plop the curls into it for 10 minutes, then let the hair air-dry.', order: 'Last, straight after the gel.'},
+  adapalene:  {how: 'One pea-sized amount for the whole face, a thin layer, on completely dry skin.', order: 'Evening: cleanser \u2192 wait until dry \u2192 adapalene \u2192 moisturiser.'},
   toothpaste: {how: 'Pea-sized amount, 2 minutes, spit but do not rinse.', order: 'After the tongue scraper and the floss.'},
   bodywash:   {how: 'Coin-sized amount, wash, rinse well.', order: 'In the shower. The face gets its own cleanser.'},
   deo:        {how: 'Two or three strokes per armpit on clean, dry skin.', order: 'After the shower, before your shirt.'},
   bodylotion: {how: 'Coin-sized amount on the dry spots: shins, arms, hands.', order: 'Straight after the shower, skin almost dry.'}
 };
+
+// 4-step how-to pictures. [caption shown in the app, what the picture shows]. look = how the product appears in every picture.
+const STEP_PICS = {
+  cleanser: {look: 'a white pump bottle of foaming face cleanser', steps: [
+    ['Wet your face with lukewarm water', 'leaning over the sink, splashing lukewarm water onto his face with both cupped hands'],
+    ['A pea-sized amount in your wet hands', 'showing his open wet palm to the camera with one pea-sized drop of clear gel cleanser in the middle, the pump bottle on the sink behind'],
+    ['Massage 30 seconds in small circles', 'massaging a light white foam over his cheeks and chin with his fingertips in small circles, eyes closed'],
+    ['Rinse, then pat dry. Do not rub', 'gently pressing a clean white towel against his cheeks to pat his face dry']]},
+  moist: {look: 'a small white tube of light face moisturiser', steps: [
+    ['A pea-sized amount on your fingertip', 'close-up of his index fingertip holding one pea-sized amount of white lotion, the small tube in his other hand'],
+    ['Five dots: forehead, cheeks, nose, chin', 'looking into the mirror with five small dots of white lotion on his forehead, both cheeks, nose and chin'],
+    ['Spread upward and outward', 'spreading the lotion upward and outward across both cheeks with flat fingers'],
+    ['The rest on your neck, let it sink in', 'smoothing the last bit of lotion down the front of his neck, his face looking fresh and calm']]},
+  spf: {look: 'a slim white tube of face sun cream, factor 50', steps: [
+    ['Two finger-lengths of sun cream', 'holding his index and middle finger toward the camera with a line of white sun cream along the full length of both fingers'],
+    ['Dot it over the whole face', 'looking into the mirror with dots of white sun cream on his forehead, cheeks, nose and chin'],
+    ['Spread evenly. Ears and neck too', 'spreading the sun cream evenly over his cheek, in front of his ear and down his neck with flat fingers'],
+    ['Last step every morning, even when cloudy', 'standing by a bright window in the morning, ready to leave, his skin looking even and not shiny']]},
+  bpo: {look: 'a small white pharmacy tube of acne gel', steps: [
+    ['Evening: clean face, wait until completely dry', 'in the evening with warm lamp light, looking at his clean, dry face in the mirror, a towel over his shoulder'],
+    ['A pea-sized amount on your fingertip', 'close-up of his index fingertip holding one pea-sized dab of clear gel, the small tube in his other hand'],
+    ['Dot it on cheeks and jaw only', 'dotting tiny amounts of clear gel along his cheeks and jawline, nowhere near his eyes or lips'],
+    ['Spread thin. Wait 10 minutes, then moisturiser', 'spreading the gel into a thin, invisible layer over his cheek with two fingertips']]},
+  adapalene: {look: 'a small white tube of prescription face gel', steps: [
+    ['Evening: clean face, wait 20 minutes until dry', 'sitting on the edge of his bed in the evening with a clean, dry face, warm lamp light, relaxed'],
+    ['ONE pea-sized amount for the whole face', 'close-up of his fingertip holding one pea-sized amount of white gel'],
+    ['Dot on forehead, cheeks and chin', 'looking into the mirror with five tiny dots of white gel on his forehead, both cheeks and chin'],
+    ['Spread thin. Not near eyes, lips or nose corners', 'spreading the gel into a thin layer over his cheek with two fingertips, his eyes and lips left untouched']]},
+  lipbalm: {look: 'a lip balm stick', steps: [
+    ['After the sun cream, take the cap off', 'holding a lip balm stick with the cap off in front of the bathroom mirror'],
+    ['Swipe 2 or 3 times over each lip', 'swiping the lip balm stick across his lower lip, close-up of the lower face'],
+    ['Press your lips together', 'pressing his lips together gently to spread the balm, close-up of the lower face'],
+    ['Again whenever your lips feel dry', 'outside on a sunny street, putting on lip balm again']]},
+  toothbrush: {look: 'a white electric toothbrush with a small round head', steps: [
+    ['A pea-sized amount of toothpaste', 'squeezing a pea-sized amount of toothpaste onto the round head of an electric toothbrush'],
+    ['Angle the head to the gumline', 'close-up, the round brush head angled against the gumline of his upper teeth'],
+    ['Slowly, tooth by tooth, for 2 minutes', 'brushing the inner sides of his lower teeth, looking into the mirror'],
+    ['Spit, but do not rinse with water', 'leaning over the sink spitting out toothpaste foam, no water glass in sight']]},
+  floss: {look: 'a small white container of dental floss', steps: [
+    ['Pull out about 40 cm (arm-length)', 'pulling a long piece of floss out of a small container, about the length of his forearm'],
+    ['Wind it round both middle fingers', 'close-up of his hands with the floss wound around both middle fingers and a short tight piece held between his thumbs'],
+    ['Slide between two teeth, curve round one tooth', 'sliding the floss gently between two front teeth, close-up of his mouth'],
+    ['Up and down, then the next gap', 'flossing a back tooth, looking into the mirror']]},
+  scraper: {look: 'a U-shaped stainless steel tongue scraper', steps: [
+    ['Every morning, before drinking or brushing', 'holding a U-shaped metal tongue scraper by both ends in front of the mirror in the morning'],
+    ['Tongue out, place it at the back', 'with his tongue stuck out, placing the scraper gently on the back of his tongue'],
+    ['Pull forward gently, 3 or 4 times', 'pulling the scraper forward along his tongue'],
+    ['Rinse the scraper under the tap', 'rinsing the tongue scraper under the running tap']]},
+  shampoo: {look: 'a bottle of curl shampoo', steps: [
+    ['Wet your hair completely', 'standing under the shower with water running through his curly hair, eyes closed'],
+    ['A coin-sized amount in your palm', 'showing his palm with a coin-sized pool of shampoo, in the shower'],
+    ['Scalp only: massage with your fingertips', 'massaging shampoo foam into his scalp with his fingertips, the lengths of his curls left alone'],
+    ['Rinse well. The foam cleans the ends', 'rinsing his hair under the shower, foam running down through his curls']]},
+  cond: {look: 'a bottle of hair conditioner', steps: [
+    ['Gently squeeze the water out', 'gently squeezing the water out of his curls with both hands in the shower'],
+    ['A generous amount in your palms', 'showing a generous amount of white conditioner in his cupped palm'],
+    ['Lengths and ends only, not the scalp', 'smoothing white conditioner through the lengths and ends of his curls'],
+    ['Comb with your fingers, rinse with cool water', 'finger-combing his curls under a cool shower']]},
+  leavein: {look: 'a round tub of white leave-in hair cream', steps: [
+    ['Hair soaking wet, head tipped forward', 'with his head tipped forward over the sink, his curly hair soaking wet and dripping'],
+    ['A coin-sized amount, rub your palms', 'rubbing a coin-sized amount of white cream between his palms'],
+    ['Rake it through with your fingers', 'raking the cream through his wet curls with spread fingers, head tipped forward'],
+    ['Smooth it over the top', 'gently smoothing his flat palms over the top of his wet curls']]},
+  gel: {look: 'a clear squeeze tube of curl styling gel', steps: [
+    ['Right after the leave-in, hair still wet', 'holding a clear tube of styling gel next to his wet curly hair'],
+    ['A walnut-sized amount in your palm', 'showing a walnut-sized amount of clear gel in his palm'],
+    ['Glide it over, then scrunch upward', 'scrunching gel upward into his wet curls with cupped palms'],
+    ['Let it dry, then scrunch out the hard feel', 'with dry, defined, soft curls, gently scrunching them with dry hands']]},
+  towel: {look: 'a grey microfibre hair towel', steps: [
+    ['Lay the towel flat', 'laying a grey microfibre towel flat on the bathroom counter'],
+    ['Lower your wet curls onto it', 'bending forward so his wet curls rest on the flat towel'],
+    ['Wrap it up and tie it', 'with his curls wrapped on top of his head in the grey towel, tied at the forehead'],
+    ['10 minutes, then let it air-dry', 'taking the towel off, defined curls drying in the air']]},
+  trimmer: {look: 'a black beard trimmer', steps: [
+    ['Clip on the 3 to 4 mm guard', 'clipping a short guard onto a black beard trimmer'],
+    ['Trim against the way it grows', 'running the trimmer upward along his jaw against the growth'],
+    ['Leave the cheek line natural', 'trimming carefully along the edge of his beard on the cheek, not shaving above it'],
+    ['Neckline: two fingers above the Adam\'s apple', 'with two fingers placed above his Adam\'s apple to mark the neckline, trimmer below them']]},
+  bodywash: {look: 'a white bottle of shower gel', steps: [
+    ['Warm water, not hot', 'in the shower, framed from the chest up, warm water running over his shoulders'],
+    ['A coin-sized amount in your hand', 'showing a coin-sized amount of shower gel in his palm, in the shower'],
+    ['Chest, armpits, back, then rinse well', 'lathering shower gel on his chest and shoulders, framed from the chest up'],
+    ['Pat dry with the towel', 'patting his shoulders dry with a towel after the shower, framed from the chest up']]},
+  deo: {look: 'a white stick deodorant', steps: [
+    ['Armpits clean and completely dry', 'drying his armpit with a towel, wearing a towel around his waist, framed from the chest up'],
+    ['Two or three strokes under each arm', 'applying stick deodorant to his armpit, framed from the chest up'],
+    ['Let it dry for a minute', 'waiting with his arms slightly away from his body, looking relaxed'],
+    ['Then put your shirt on', 'pulling a clean white t-shirt over his head']]},
+  bodylotion: {look: 'a white bottle of body lotion', steps: [
+    ['After the shower, skin almost dry', 'after a shower, lightly patting his arm with a towel'],
+    ['A coin-sized amount in your palm', 'showing a coin-sized amount of white lotion in his palm'],
+    ['Rub it into shins and knees', 'sitting on the edge of the bathtub rubbing lotion into his shin'],
+    ['Then arms, elbows and hands', 'rubbing lotion into his forearm and elbow']]}
+};
+STEP_PICS.toothpaste = {same: 'toothbrush'};
+// Order to make them in: daily face first.
+const STEP_BATCHES = [
+  ['Batch 1: your face, every day', ['cleanser', 'moist', 'spf', 'bpo', 'lipbalm']],
+  ['Batch 2: teeth and mouth', ['toothbrush', 'floss', 'scraper']],
+  ['Batch 3: hair (wash days)', ['shampoo', 'cond', 'leavein', 'gel', 'towel']],
+  ['Batch 4: body and beard', ['bodywash', 'deo', 'bodylotion', 'trimmer']],
+  ['Batch 5: after the doctor', ['adapalene']]
+];
+const STEP_PREFIX = 'Use the same man as in the reference photo: same face, same curly hair, same skin and stubble. Photorealistic photo, clean white bathroom, soft natural window light. ';
+const STEP_END = ' Framed close so the action and the amount are easy to see. Vertical 3:4. No text, no numbers, no labels, no logos, no watermark. Natural hands with five fingers.';
