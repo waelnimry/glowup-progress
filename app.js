@@ -44,7 +44,7 @@ const dbEntries = store => new Promise((res, rej) => {
   c.onerror = () => rej(c.error);
 });
 
-const S = { days: {}, pantry: {}, shop: {}, log: [], set: {plan: {}, basics: {}}, photos: [], scans: [], prod: {} };
+const S = { days: {}, pantry: {}, shop: {}, log: [], set: {plan: {}, basics: {}}, photos: [], scans: [], prod: {}, myFoods: {}, myRecipes: {}, aiKey: '' };
 const ui = { view: 'today', mealsDate: null, open: {}, pt: 'take', tlSlot: 'face', cmpSlot: 'face', food: 'pantry', prog: 'photos', areas: 'face' };
 const LINE_START = '2026-10-04', HOLD_SUNDAYS = ['2026-11-22'], WEEKS = 26;
 
@@ -59,6 +59,14 @@ async function loadAll() {
   S.set = Object.assign({plan: {}, basics: {}}, kv ? kv.v : {});
   const kvAll = await dbEntries('kv'); const sc = kvAll.find(e => e.k === 'scans'); S.scans = sc ? sc.v : [];
   S.prod = {}; for (const e of kvAll) if (typeof e.k === 'string' && e.k.startsWith('prod:')) S.prod[e.k.slice(5)] = e.v;
+  const kvv = k => { const e = kvAll.find(x => x.k === k); return e ? e.v : null; };
+  S.myFoods = kvv('myFoods') || {}; S.myRecipes = kvv('myRecipes') || {}; S.aiKey = kvv('aiKey') || '';
+  // migrate: custom items used to live only in the pantry and vanished at 0 g
+  let mig = false;
+  for (const p of Object.values(S.pantry)) if (p.custom && !S.myFoods[p.id]) { S.myFoods[p.id] = {n: p.n, k: p.k || 0, p: p.p || 0, c: p.c || 0, f: p.f || 0, cat: p.cat || 'Other', pack: 0}; mig = true; }
+  if (mig) await dbPut('kv', 'myFoods', S.myFoods);
+  for (const k of Object.keys(RECIPES)) if (RECIPES[k].mine) delete RECIPES[k];
+  for (const r of Object.values(S.myRecipes)) RECIPES[r.id] = r;
   await reloadPhotos();
 }
 const saveSet = () => dbPut('kv', 'settings', S.set);
@@ -79,8 +87,11 @@ async function saveShop(id) {
 }
 
 // ====================== food & recipe maths ======================
-const foodOf = id => FOODS[id] || (S.pantry[id] && S.pantry[id].custom ? S.pantry[id] : null);
+const foodOf = id => FOODS[id] || S.myFoods[id] || (S.pantry[id] && S.pantry[id].custom ? S.pantry[id] : null);
 const fname = id => { const f = foodOf(id); return f ? (f.n || f.name || id) : id; };
+const isStaple = id => !!(FOODS[id] && FOODS[id].staple);
+const saveMyFoods = () => dbPut('kv', 'myFoods', S.myFoods);
+const saveMyRecipes = () => dbPut('kv', 'myRecipes', S.myRecipes);
 function macros(ing) {
   const m = {k: 0, p: 0, c: 0, f: 0};
   for (const [id, g] of ing) { const f = foodOf(id); if (!f) continue; m.k += (f.k || 0) * g / 100; m.p += (f.p || 0) * g / 100; m.c += (f.c || 0) * g / 100; m.f += (f.f || 0) * g / 100; }
@@ -94,7 +105,7 @@ function amt(id, g) {
 const have = id => (S.pantry[id] && S.pantry[id].g) || 0;
 function missingOf(r) {
   const out = [];
-  for (const [id, g] of r.ing) { const f = FOODS[id]; if (!f || f.staple) continue; const h = have(id); if (h + 1e-6 < g) out.push({id, need: g, have: h, short: g - h}); }
+  for (const [id, g] of r.ing) { if (isStaple(id)) continue; const h = have(id); if (h + 1e-6 < g) out.push({id, need: g, have: h, short: g - h}); }
   return out;
 }
 function plannedId(date, slot) {
@@ -211,8 +222,8 @@ function vMeals() {
     if (open) {
       h += '<div style="margin-top:10px">';
       for (const [id, g] of r.ing) {
-        const f = FOODS[id], hv = have(id), short = !f.staple && hv + 1e-6 < g;
-        h += '<div class="ing"><span>' + esc(f.staple ? f.n.split(' (')[0] : f.n) + (f.staple ? ' <span class="note">(basics)</span>' : '') + '</span><span class="' + (short ? 'need' : '') + '">' + amt(id, g) + (f.staple ? '' : (short ? ' · have ' + r0(hv) + ' g' : ' ✓')) + '</span></div>';
+        const st = isStaple(id), hv = have(id), short = !st && hv + 1e-6 < g, nm = st ? FOODS[id].n.split(' (')[0] : fname(id);
+        h += '<div class="ing"><span>' + esc(nm) + (st ? ' <span class="note">(basics)</span>' : '') + '</span><span class="' + (short ? 'need' : '') + '">' + amt(id, g) + (st ? '' : (short ? ' \u00b7 have ' + r0(hv) + ' g' : ' \u2713')) + '</span></div>';
       }
       h += '<div class="note" style="margin-top:6px">Weights are raw or dry, before cooking. 40 g dry rice is about 120 g cooked.</div>';
       h += '<ol class="st">' + r.steps.map(s => '<li>' + esc(s) + '</li>').join('') + '</ol>';
@@ -224,6 +235,7 @@ function vMeals() {
     h += '</div>';
   }
   h += '<div class="card"><div class="row"><div class="grow"><div class="t">Ate something else?</div><div class="h">Log it so the day’s totals stay honest</div></div>' + btn('extra', 'Add', {date: d}, 'sec sm') + '</div></div>';
+  h += vMyRecipes();
   const extras = logsFor(d).filter(e => e.extra);
   for (const e of extras) h += '<div class="row note" style="margin:0 4px 8px"><div class="grow">' + esc(e.n) + ' · ' + r0(e.k) + ' kcal · ' + r0(e.p) + ' g protein</div>' + btn('undo', 'Undo', {key: e.key}, 'sec sm') + '</div>';
   return h;
@@ -232,9 +244,9 @@ function vMeals() {
 function openChange(date, slot) {
   const cur = plannedId(date, slot);
   let h = '<h2>Change ' + SLOTS.find(s => s.id === slot).label.toLowerCase() + '</h2><p class="note">Ready means everything is in your pantry.</p>';
-  for (const r of Object.values(RECIPES).filter(r => r.slots.includes(slot))) {
+  for (const r of Object.values(RECIPES).filter(r => r.slots.includes(slot)).sort((a, b) => ((b.fav ? 2 : b.mine ? 1 : 0) - (a.fav ? 2 : a.mine ? 1 : 0)))) {
     const m = macros(r.ing), miss = missingOf(r).length;
-    h += '<button class="tick' + (r.id === cur ? ' on' : '') + '" data-act="pick" data-date="' + date + '" data-slot="' + slot + '" data-rid="' + r.id + '"><span class="grow"><div class="t">' + esc(r.n) + '</div><div class="h">' + r0(m.k) + ' kcal · ' + r0(m.p) + ' g protein</div></span>' + (miss ? chip('Blocked', 'no') : chip('Ready', 'ok')) + '</button>';
+    h += '<button class="tick' + (r.id === cur ? ' on' : '') + '" data-act="pick" data-date="' + date + '" data-slot="' + slot + '" data-rid="' + r.id + '"><span class="grow"><div class="t">' + (r.fav ? '\u2605 ' : '') + esc(r.n) + (r.mine ? ' <span class="note">(mine)</span>' : '') + '</div><div class="h">' + r0(m.k) + ' kcal \u00b7 ' + r0(m.p) + ' g protein</div></span>' + (miss ? chip('Blocked', 'no') : chip('Ready', 'ok')) + '</button>';
   }
   sheet(h + btn('closesheet', 'Close', {}, 'sec'));
 }
@@ -259,8 +271,8 @@ function openCook(rid, slot, date) {
   const r = RECIPES[rid];
   let h = '<h2>Cook ' + esc(r.n) + '</h2><p class="note">Raw or dry weights. Change an amount if you used a different one. It is taken from your pantry.</p>';
   r.ing.forEach(([id, g], i) => {
-    const f = FOODS[id];
-    h += '<div class="ing"><span class="grow" style="padding-top:8px">' + esc(f.staple ? f.n.split(' (')[0] : f.n) + (f.staple ? ' <span class="note">(basics)</span>' : '') + '</span><span style="width:96px"><input type="number" inputmode="decimal" id="ck' + i + '" data-ck="' + id + '" value="' + g + '"></span></div>';
+    const st = isStaple(id);
+    h += '<div class="ing"><span class="grow" style="padding-top:8px">' + esc(st ? FOODS[id].n.split(' (')[0] : fname(id)) + (st ? ' <span class="note">(basics)</span>' : '') + '</span><span style="width:96px"><input type="number" inputmode="decimal" id="ck' + i + '" data-ck="' + id + '" value="' + g + '"></span></div>';
   });
   h += '<div id="ckmac"></div><div class="row" style="margin-top:12px;flex-wrap:wrap">' + btn('cookgo', 'Cook and log it', {rid, slot, date}, '') + btn('closesheet', 'Cancel', {}, 'sec') + '</div>';
   sheet(h);
@@ -270,8 +282,8 @@ function openCook(rid, slot, date) {
 async function doCook(rid, slot, date) {
   const r = RECIPES[rid];
   const ing = [...document.querySelectorAll('[data-ck]')].map(i => [i.dataset.ck, parseFloat(i.value) || 0]);
-  for (const [id, g] of ing) { const f = FOODS[id]; if (!f.staple && g > have(id) + 1e-6) { toast('Not enough ' + f.n + ' in the pantry (' + r0(have(id)) + ' g)', true); return; } }
-  const used = ing.filter(([id, g]) => !FOODS[id].staple && g > 0);
+  for (const [id, g] of ing) { if (!isStaple(id) && g > have(id) + 1e-6) { toast('Not enough ' + fname(id) + ' in the pantry (' + r0(have(id)) + ' g)', true); return; } }
+  const used = ing.filter(([id, g]) => !isStaple(id) && g > 0);
   for (const [id, g] of used) await setPantry(id, {g: have(id) - g});
   const m = macros(ing), ts = Date.now(), key = date + '|' + ts + '|' + Math.random().toString(36).slice(2, 6);
   const entry = {date, slot, rid, n: r.n, k: m.k, p: m.p, c: m.c, f: m.f, used, ts, extra: false};
@@ -286,7 +298,7 @@ async function undoLog(key) {
 
 function openExtra(date) {
   const opts = Object.entries(FOODS).filter(([, f]) => !f.staple).map(([id, f]) => '<option value="' + id + '">' + esc(f.n) + '</option>').join('') +
-    Object.values(S.pantry).filter(p => p.custom).map(p => '<option value="' + p.id + '">' + esc(p.n) + '</option>').join('');
+    Object.entries(S.myFoods).map(([id, f]) => '<option value="' + id + '">' + esc(f.n) + ' (mine)</option>').join('');
   let h = '<h2>Log something else</h2><p class="note">Pick a food and the grams, or type the numbers yourself.</p>' +
     '<select id="exfood"><option value="">Something else (type numbers)</option>' + opts + '</select>' +
     '<div class="note" style="margin-top:10px">Grams</div><input type="number" inputmode="decimal" id="exg" placeholder="100">' +
@@ -302,7 +314,7 @@ async function doExtra(date) {
   let entry;
   if (id) {
     const g = parseFloat($('#exg').value); if (!(g > 0)) return toast('Enter the grams', true);
-    const m = macros([[id, g]]); const take = $('#extake').checked && !FOODS[id]?.staple;
+    const m = macros([[id, g]]); const take = $('#extake').checked && !isStaple(id);
     if (take) { if (g > have(id) + 1e-6) return toast('Only ' + r0(have(id)) + ' g in the pantry. Untick "take it from my pantry" or fix the grams.', true); await setPantry(id, {g: have(id) - g}); }
     entry = {date, slot: 'extra', rid: '', n: fname(id) + ' ' + r0(g) + ' g', k: m.k, p: m.p, c: m.c, f: m.f, used: take ? [[id, g]] : [], ts, extra: true};
   } else {
@@ -316,14 +328,16 @@ async function doExtra(date) {
 // ---------- PANTRY ----------
 function vPantry() {
   const items = Object.values(S.pantry);
-  let h = '<h1>Pantry</h1><p class="sub">The food you have at home right now. Cooking takes from it, shopping adds to it.</p><div class="row" style="margin-bottom:12px">' + btn('padd', 'Add food', {}, '') + '</div>';
-  if (!items.length) return h + '<div class="empty">Your pantry is empty.<br>Open the Shop tab, or tap Add food to enter what you already have.</div>';
+  let h = '<h1>Pantry</h1><p class="sub">The food you have at home right now. Cooking takes from it, shopping adds to it.</p><div class="row" style="margin-bottom:12px;flex-wrap:wrap;gap:8px">' + btn('padd', 'Add food', {}, '') + btn('photofood', 'Add from a photo', {}, 'sec') + '</div>';
+  const mineHave = Object.keys(S.myFoods).filter(id => have(id) > 0);
+  if (mineHave.length) h += '<div class="card"><div class="row"><div class="grow"><div class="t">Make a meal from my own items</div><div class="h">' + esc(mineHave.map(fname).join(', ')) + '</div></div></div><div class="row" style="margin-top:10px;flex-wrap:wrap;gap:8px">' + btn('airecipe', 'Make me a meal', {scope: 'mine'}, '') + btn('airecipe', 'Use everything I have', {scope: 'all'}, 'sec') + '</div></div>';
+  if (!items.length) return h + '<div class="empty">Your pantry is empty.<br>Open the Shop tab, tap Add food, or take a photo of a product’s barcode.</div>';
   const cats = {};
-  for (const p of items) { const f = foodOf(p.id); const c = p.custom ? 'Other' : (f ? f.cat : 'Other'); (cats[c] = cats[c] || []).push(p); }
+  for (const p of items) { const f = foodOf(p.id); const c = S.myFoods[p.id] ? 'My own items' : (f ? f.cat : 'Other'); (cats[c] = cats[c] || []).push(p); }
   for (const c of Object.keys(cats).sort()) {
     h += '<div class="card"><h2>' + esc(c) + '</h2>';
     for (const p of cats[c].sort((a, b) => fname(a.id).localeCompare(fname(b.id)))) {
-      const f = foodOf(p.id), low = f && f.pack > 1 && !p.custom && p.g < f.pack * 0.15;
+      const f = foodOf(p.id), low = f && f.pack > 1 && !S.myFoods[p.id] && p.g < f.pack * 0.15;
       h += '<div class="ing" style="align-items:center"><span class="grow">' + esc(fname(p.id)) + (low ? ' ' + chip('low', 'no') : '') + '</span><span style="margin-right:8px"><b>' + amt(p.id, p.g) + '</b></span>' + btn('pset', 'Edit', {id: p.id}, 'sec sm') + '</div>';
     }
     h += '</div>';
@@ -349,8 +363,8 @@ async function doPantryAdd() {
   if (id) await setPantry(id, {g: have(id) + g});
   else {
     const n = $('#pan').value.trim(); if (!n) return toast('Enter a name', true);
-    const cid = 'c_' + Date.now().toString(36);
-    await setPantry(cid, {id: cid, custom: true, n, g, k: parseFloat($('#pak').value) || 0, p: parseFloat($('#pap').value) || 0, c: parseFloat($('#pac').value) || 0, f: parseFloat($('#paf').value) || 0, cat: 'Other'});
+    const cid = await upsertMyFood({n, k: parseFloat($('#pak').value) || 0, p: parseFloat($('#pap').value) || 0, c: parseFloat($('#pac').value) || 0, f: parseFloat($('#paf').value) || 0, cat: 'Other', pack: 0});
+    await setPantry(cid, {g: have(cid) + g});
   }
   closeSheet(); toast('Added to the pantry'); render();
 }
@@ -387,7 +401,7 @@ async function weekFill() {
     const d = addDays(today, i);
     for (const sl of SLOTS) {
       if (logsFor(d, sl.id).some(e => !e.extra)) continue;
-      for (const [id, g] of RECIPES[plannedId(d, sl.id)].ing) if (!FOODS[id].staple) need[id] = (need[id] || 0) + g;
+      for (const [id, g] of RECIPES[plannedId(d, sl.id)].ing) if (!isStaple(id)) need[id] = (need[id] || 0) + g;
     }
   }
   let n = 0;
@@ -697,11 +711,168 @@ function openSnapshot() {
   sheet('<h2>Send to Claude</h2><p class="note">This is a short text summary of your numbers. No photos, no names. Copy it and paste it into our chat.</p><div class="prompt" id="snaptxt" style="white-space:pre-wrap">' + esc(snapshot()) + '</div><div class="row" style="margin-top:12px;flex-wrap:wrap">' + btn('copysnap', 'Copy it', {}, '') + btn('closesheet', 'Close', {}, 'sec') + '</div>');
 }
 
+
+// ====================== my own foods, barcode lookup, AI helper ======================
+async function upsertMyFood(d) {
+  const key = d.n.trim().toLowerCase();
+  let id = Object.keys(S.myFoods).find(k => S.myFoods[k].n.trim().toLowerCase() === key);
+  if (!id) id = 'c_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
+  const old = S.myFoods[id] || {};
+  S.myFoods[id] = Object.assign({}, old, d, {n: old.n || d.n.trim(), k: d.k || old.k || 0, p: d.p || old.p || 0, c: d.c || old.c || 0, f: d.f || old.f || 0});
+  await saveMyFoods(); return id;
+}
+async function offLookup(code) {
+  const r = await fetch('https://world.openfoodfacts.org/api/v2/product/' + encodeURIComponent(code) + '.json?fields=product_name,product_name_de,brands,product_quantity,quantity,nutriments,categories_tags');
+  if (!r.ok) return null; const j = await r.json(); if (j.status !== 1 || !j.product) return null;
+  const p = j.product, n = p.nutriments || {}, kcal = n['energy-kcal_100g'] != null ? n['energy-kcal_100g'] : (n['energy_100g'] != null ? n['energy_100g'] / 4.184 : null);
+  return {n: (p.product_name_de || p.product_name || 'Unknown product') + (p.brands ? ' (' + p.brands.split(',')[0].trim() + ')' : ''), k: kcal == null ? null : r1(kcal), p: n.proteins_100g, c: n.carbohydrates_100g, f: n.fat_100g, pack: parseFloat(p.product_quantity) || null, src: 'Open Food Facts, barcode ' + code};
+}
+const AI_MODELS = ['gemini-flash-lite-latest', 'gemini-flash-latest'];
+async function aiCall(parts, temperature) {
+  if (!S.aiKey) throw new Error('No AI key yet. Add one in More \u203a AI helper.');
+  let last = '';
+  for (const model of AI_MODELS) {
+    let r;
+    try {
+      r = await fetch('https://generativelanguage.googleapis.com/v1beta/models/' + model + ':generateContent', {method: 'POST', headers: {'content-type': 'application/json', 'x-goog-api-key': S.aiKey},
+        body: JSON.stringify({contents: [{parts}], generationConfig: {responseMimeType: 'application/json', temperature: temperature == null ? 0.7 : temperature}})});
+    } catch (e) { throw new Error('No internet connection. The AI needs internet.'); }
+    if (r.status === 404) { last = 'model not available'; continue; }
+    if (!r.ok) {
+      const code = r.status;
+      if (code === 402) throw new Error('Your AI account has no credit left. Add credit in Google AI Studio, or use a free key.');
+      if (code === 429) throw new Error('Too many AI requests right now. Wait a minute and try again.');
+      if (code === 400 || code === 401 || code === 403) throw new Error('The AI key was refused. Check it in More \u203a AI helper.');
+      throw new Error('The AI service failed (error ' + code + '). Try again later.');
+    }
+    const j = await r.json(), txt = ((j.candidates || [])[0]?.content?.parts || []).map(p => p.text || '').join('');
+    try { return JSON.parse(txt.replace(/^```(json)?|```$/g, '').trim()); } catch (e) { throw new Error('The AI answer could not be read. Try again.'); }
+  }
+  throw new Error('No AI model is available on this key (' + last + ').');
+}
+async function imgToBase64(file) {
+  const img = await createImageBitmap(file), k = Math.min(1, 1024 / Math.max(img.width, img.height)), cv = document.createElement('canvas');
+  cv.width = Math.round(img.width * k); cv.height = Math.round(img.height * k); cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
+  return {bitmap: img, b64: cv.toDataURL('image/jpeg', 0.85).split(',')[1]};
+}
+async function readBarcode(bitmap) {
+  if (!('BarcodeDetector' in window)) return null;
+  try { const det = new BarcodeDetector({formats: ['ean_13', 'ean_8', 'upc_a', 'upc_e']}); const codes = await det.detect(bitmap); return codes.length ? codes[0].rawValue : null; } catch (e) { return null; }
+}
+const CATS = ['Protein', 'Carbs', 'Veg', 'Fruit', 'Dairy', 'Fat', 'Other'];
+function foodForm(d, note) {
+  const v = x => x == null || isNaN(x) ? '' : x;
+  sheet('<h2>Add to my pantry</h2>' + (note ? '<p class="note">' + esc(note) + '</p>' : '') +
+    '<div class="note">Name</div><input type="text" id="ffn" value="' + esc(d.n || '') + '">' +
+    '<div class="note" style="margin-top:8px">How many grams do you have?</div><input type="number" inputmode="decimal" id="ffg" value="' + v(d.pack) + '" placeholder="e.g. 400">' +
+    '<div class="note" style="margin-top:8px">Per 100 g: kcal \u00b7 protein \u00b7 carbs \u00b7 fat</div><div class="row"><input type="number" id="ffk" value="' + v(d.k) + '" placeholder="kcal"><input type="number" id="ffp" value="' + v(d.p) + '" placeholder="protein"></div><div class="row" style="margin-top:8px"><input type="number" id="ffc" value="' + v(d.c) + '" placeholder="carbs"><input type="number" id="fff" value="' + v(d.f) + '" placeholder="fat"></div>' +
+    '<div class="note" style="margin-top:8px">Type</div><select id="ffcat">' + CATS.map(c => '<option' + (c === (d.cat || 'Other') ? ' selected' : '') + '>' + c + '</option>').join('') + '</select>' +
+    '<div class="row" style="margin-top:12px;flex-wrap:wrap;gap:8px">' + btn('ffsave', 'Add it', {}, '') + (S.aiKey ? btn('fflook', 'Fill the numbers with AI', {}, 'sec') : '') + btn('closesheet', 'Cancel', {}, 'sec') + '</div>');
+}
+async function photoFood() {
+  const f = document.createElement('input'); f.type = 'file'; f.accept = 'image/*'; f.setAttribute('capture', 'environment');
+  f.onchange = () => { if (f.files[0]) handleFoodPhoto(f.files[0]); };
+  f.click();
+}
+async function handleFoodPhoto(file) {
+    toast('Reading the photo\u2026');
+    try {
+      const {bitmap, b64} = await imgToBase64(file);
+      const code = await readBarcode(bitmap);
+      if (code) { const hit = await offLookup(code); if (hit) return foodForm(hit, 'Found by the barcode in ' + hit.src + '. Check the numbers, then enter how much you have.'); }
+      if (!S.aiKey) return foodForm({}, code ? 'Barcode ' + code + ' is not in the free food database, and the AI helper has no key yet. Type it in, or add a key in More \u203a AI helper.' : 'No barcode found in the photo. Type it in, or add an AI key in More \u203a AI helper so loose items can be recognised.');
+      const j = await aiCall([{inline_data: {mime_type: 'image/jpeg', data: b64}}, {text: 'What food item is in this photo? If it is packaged, read the label and the nutrition table. Return JSON only: {"name": string, "brand": string or null, "is_food": boolean, "package_grams": number or null, "per100g": {"kcal": number, "protein": number, "carbs": number, "fat": number}, "category": one of "Protein","Carbs","Veg","Fruit","Dairy","Fat","Other", "read_from_label": boolean}'}], 0.2);
+      if (j.is_food === false) return toast('That does not look like food. For skin or hair products use the product cards.', true);
+      foodForm({n: (j.name || '') + (j.brand ? ' (' + j.brand + ')' : ''), pack: j.package_grams, k: j.per100g?.kcal, p: j.per100g?.protein, c: j.per100g?.carbs, f: j.per100g?.fat, cat: CATS.includes(j.category) ? j.category : 'Other'},
+        j.read_from_label ? 'Recognised by the AI and read from the label. Check the numbers.' : 'Recognised by the AI. The numbers are typical values, not from your pack: check them against the label.');
+    } catch (e) { toast(e.message, true); }
+}
+async function saveFoodForm() {
+  const n = $('#ffn').value.trim(), g = parseFloat($('#ffg').value);
+  if (!n) return toast('Enter a name', true); if (!(g > 0)) return toast('Enter how many grams you have', true);
+  const id = await upsertMyFood({n, k: parseFloat($('#ffk').value) || 0, p: parseFloat($('#ffp').value) || 0, c: parseFloat($('#ffc').value) || 0, f: parseFloat($('#fff').value) || 0, cat: $('#ffcat').value, pack: g});
+  await setPantry(id, {g: have(id) + g}); closeSheet(); toast(n + ' added to your pantry'); render();
+}
+async function fillWithAI() {
+  const n = $('#ffn').value.trim(); if (!n) return toast('Type the name first', true);
+  try {
+    toast('Asking the AI\u2026');
+    const j = await aiCall([{text: 'Typical nutrition per 100 g (as sold, uncooked) for this food: "' + n + '". Return JSON only: {"per100g": {"kcal": number, "protein": number, "carbs": number, "fat": number}, "category": one of "Protein","Carbs","Veg","Fruit","Dairy","Fat","Other"}'}], 0.1);
+    $('#ffk').value = j.per100g?.kcal ?? ''; $('#ffp').value = j.per100g?.protein ?? ''; $('#ffc').value = j.per100g?.carbs ?? ''; $('#fff').value = j.per100g?.fat ?? '';
+    if (CATS.includes(j.category)) $('#ffcat').value = j.category; toast('Filled with typical values. Your label wins if it differs.');
+  } catch (e) { toast(e.message, true); }
+}
+let lastAI = null, aiAvoid = [];
+function nextSlot(date) {
+  const order = ['breakfast', 'lunch', 'pre', 'dinner', 'night'];
+  return order.find(sl => !logsFor(date, sl).some(e => !e.extra)) || 'dinner';
+}
+async function aiRecipe(scope) {
+  const t = todayISO(), tot = totals(t), slot = nextSlot(t), sl = SLOTS.find(x => x.id === slot);
+  const inPantry = Object.values(S.pantry).filter(p => p.g > 0);
+  const mine = inPantry.filter(p => S.myFoods[p.id]);
+  const pool = scope === 'mine' ? inPantry.filter(p => S.myFoods[p.id] || ['egg', 'quark', 'rice', 'potato', 'oats', 'frozenveg', 'broccoli', 'onion', 'tomato', 'pepper', 'spinach'].includes(p.id)) : inPantry;
+  if (!pool.length) return toast('Your pantry is empty', true);
+  const line = p => { const f = foodOf(p.id) || {}; return '- id "' + p.id + '": ' + fname(p.id) + ', ' + r0(p.g) + ' g available, per 100 g ' + r0(f.k || 0) + ' kcal / ' + r1(f.p || 0) + ' g protein / ' + r1(f.c || 0) + ' g carbs / ' + r1(f.f || 0) + ' g fat'; };
+  const kcal = Math.max(300, Math.min(sl.kcal + 150, TARGET.kcal - tot.k)), prot = Math.max(25, Math.min(60, TARGET.p - tot.p));
+  const prompt = 'You are the meal planner inside a personal fitness routine app (strict fat-loss diet, high protein). Create ONE recipe for one person.\n' +
+    'Use ONLY these pantry items, with their exact ids:\n' + pool.map(line).join('\n') +
+    '\nBasics you may also use: "oil" (at most 10 g), "spices", "soy", "mustard", "vinegar", "lemon".\n' +
+    (scope === 'mine' && mine.length ? 'The recipe MUST use at least one of these new items: ' + mine.map(p => fname(p.id)).join(', ') + '.\n' : '') +
+    'Meal: ' + sl.label + '. Aim for about ' + r0(kcal) + ' kcal and at least ' + r0(prot) + ' g protein. Plain, healthy home cooking with no particular national cuisine. At most 25 minutes. 3 to 6 short numbered steps that state grams, heat and minutes. Never use more grams than available.\n' +
+    (aiAvoid.length ? 'Do not suggest these again: ' + aiAvoid.join('; ') + '.\n' : '') +
+    'Reply JSON only: {"name": string, "slot": "' + slot + '", "ingredients": [{"id": string, "grams": number}], "steps": [string]}';
+  toast('The AI is thinking of a meal\u2026');
+  try {
+    const j = await aiCall([{text: prompt}], 0.9);
+    const ok = new Set([...pool.map(p => p.id), 'oil', 'spices', 'soy', 'mustard', 'vinegar', 'lemon']);
+    const ing = (j.ingredients || []).filter(x => ok.has(x.id) && x.grams > 0).map(x => [x.id, Math.round(x.grams)]);
+    const over = ing.find(([id, g]) => !isStaple(id) && g > have(id) + 1e-6);
+    if (over) throw new Error('The AI asked for more ' + fname(over[0]) + ' than you have (' + r0(have(over[0])) + ' g). Tap it again for another idea.');
+    if (macros(ing).k > kcal * 1.8) throw new Error('The AI made a meal that is far too big for today. Tap it again for another idea.');
+    if (!ing.filter(([id]) => !isStaple(id)).length || !Array.isArray(j.steps) || !j.steps.length) throw new Error('The AI gave an unusable recipe. Try again.');
+    if (scope === 'mine' && mine.length && !ing.some(([id]) => S.myFoods[id])) throw new Error('The AI ignored your new items. Try again.');
+    lastAI = {n: String(j.name || 'My meal').slice(0, 60), slot: SLOTS.some(x => x.id === j.slot) ? j.slot : slot, ing, steps: j.steps.map(String).slice(0, 8)};
+    aiAvoid.push(lastAI.n); aiAvoid = aiAvoid.slice(-6);
+    showAIRecipe(scope);
+  } catch (e) { toast(e.message, true); }
+}
+function showAIRecipe(scope) {
+  const r = lastAI, m = macros(r.ing);
+  let h = '<h2>' + esc(r.n) + '</h2><p class="note">' + esc(SLOTS.find(x => x.id === r.slot).label) + ' \u00b7 made by the AI from your pantry. Calories are calculated by the app from your food numbers, not guessed by the AI.</p>' + macBars(m);
+  h += '<div class="sec-t">Ingredients</div>' + r.ing.map(([id, g]) => '<div class="ing"><span>' + esc(isStaple(id) ? FOODS[id].n.split(' (')[0] : fname(id)) + '</span><span>' + amt(id, g) + '</span></div>').join('');
+  h += '<div class="sec-t">Steps</div><ol class="st">' + r.steps.map(x => '<li>' + esc(x) + '</li>').join('') + '</ol>';
+  h += '<div class="row" style="margin-top:12px;flex-wrap:wrap;gap:8px">' + btn('aisave', 'Save to my recipes', {}, '') + btn('aicook', 'Save and cook now', {}, 'sec') + btn('airecipe', 'Something else', {scope}, 'sec') + btn('closesheet', 'Close', {}, 'sec') + '</div>';
+  sheet(h);
+}
+async function saveAIRecipe() {
+  const r = lastAI; if (!r) return null;
+  const id = 'u_' + Date.now().toString(36);
+  const rec = {id, n: r.n, slots: r.slot === 'lunch' || r.slot === 'dinner' ? ['lunch', 'dinner'] : [r.slot], ing: r.ing, steps: r.steps, v: '', vt: '', mine: true, fav: false, made: todayISO()};
+  S.myRecipes[id] = rec; RECIPES[id] = rec; await saveMyRecipes(); return rec;
+}
+function vMyRecipes() {
+  const list = Object.values(S.myRecipes).sort((a, b) => (b.fav - a.fav) || a.n.localeCompare(b.n));
+  if (!list.length) return '';
+  let h = '<div class="card"><h2>My recipes</h2><p class="note">Saved from the AI. They turn Ready whenever you have the items again. Star one to put it at the top of \u201cChange meal\u201d.</p>';
+  for (const r of list) {
+    const m = macros(r.ing), miss = missingOf(r).length;
+    h += '<div class="ing" style="align-items:center"><span class="grow">' + (r.fav ? '\u2605 ' : '') + esc(r.n) + '<div class="note">' + r0(m.k) + ' kcal \u00b7 ' + r0(m.p) + ' g protein \u00b7 ' + esc(r.slots.map(x => SLOTS.find(s => s.id === x).label).join(' / ')) + '</div></span>' + (miss ? chip('Blocked', 'no') : chip('Ready', 'ok')) + '</div><div class="row" style="gap:6px;margin:4px 0 8px;flex-wrap:wrap">' + btn('myfav', r.fav ? 'Unstar' : '\u2605 Add to my menu', {id: r.id}, 'sec sm') + btn('mydel', 'Delete', {id: r.id}, 'sec sm') + '</div>';
+  }
+  return h + '</div>';
+}
+function vAI() {
+  return '<div class="card"><div class="t">AI helper</div><div class="h" style="margin:6px 0 10px">Makes recipes from your pantry and recognises food without a barcode. It uses a Google Gemini key that is stored only on this phone and is never put in the backup file.</div>' +
+    '<input type="password" id="aikey" placeholder="Paste your Gemini API key" value="' + esc(S.aiKey) + '">' +
+    '<div class="row" style="margin-top:10px;flex-wrap:wrap;gap:8px">' + btn('aikeysave', 'Save key', {}, '') + btn('aitest', 'Test it', {}, 'sec') + (S.aiKey ? btn('aikeydel', 'Remove key', {}, 'sec') : '') + '</div>' +
+    '<div class="note" style="margin-top:8px">Barcode photos work without a key: they use the free Open Food Facts database.</div></div>';
+}
+
 // ---------- BACKUP ----------
 function vBackup() {
   const est = ui.est;
   return '<h1>Backup</h1><p class="sub">Everything lives only on this phone</p>' +
-    '<div class="card"><div class="t">' + S.photos.length + ' photos' + (est ? ' · ' + est + ' MB used' : '') + '</div><div class="h" style="margin:6px 0 12px">' + (ui.persisted ? 'Storage is protected from being cleared by the phone.' : 'The phone could clear this storage if it runs very low on space. Make a backup now and then.') + '</div>' + btn('zip', 'Save all photos as a ZIP', {}, S.photos.length ? '' : '') + '<div class="note" style="margin-top:8px">Saves to your Downloads. Do this every Sunday.</div></div>' +
+    vAI() + '<div class="card"><div class="t">' + S.photos.length + ' photos' + (est ? ' · ' + est + ' MB used' : '') + '</div><div class="h" style="margin:6px 0 12px">' + (ui.persisted ? 'Storage is protected from being cleared by the phone.' : 'The phone could clear this storage if it runs very low on space. Make a backup now and then.') + '</div>' + btn('zip', 'Save all photos as a ZIP', {}, S.photos.length ? '' : '') + '<div class="note" style="margin-top:8px">Saves to your Downloads. Do this every Sunday.</div></div>' +
     '<div class="card"><div class="t">Meals, pantry, shopping, routine</div><div class="h" style="margin:6px 0 12px">One small file with everything except the photos.</div><div class="row" style="flex-wrap:wrap">' + btn('jsonout', 'Save data file', {}, '') + btn('jsonin', 'Restore from a data file', {}, 'sec') + '</div></div>' +
     '<div class="card"><div class="t">Picture prompts</div><div class="h" style="margin:6px 0 12px">16 prompts to make a picture of a man using each face and hair product, in the Gemini app.</div>' + btn('go', 'Open the prompts', {v: 'prompts'}, '') + '</div>' + '<div class="card"><div class="t">Send to Claude</div><div class="h" style="margin:6px 0 12px">A short text summary of your streak, food, weight and scans to paste into the chat. No photos.</div>' + btn('snap', 'Make the summary', {}, '') + '</div>' + '<div class="card"><div class="t">Privacy</div><div class="h">Nothing is ever uploaded. There is no account and no server. Your photos and data exist only in this app on this phone, plus any file you save yourself.</div></div>';
 }
@@ -723,7 +894,7 @@ async function makeZip() {
   download(new Blob([...parts, ...cd, end], {type: 'application/zip'}), 'routine-photos-' + todayISO() + '.zip');
 }
 function exportJSON() {
-  const data = {app: 'routine', version: 2, exported: todayISO(), days: S.days, pantry: S.pantry, shop: S.shop, log: S.log, settings: S.set, scans: S.scans};
+  const data = {app: 'routine', version: 2, exported: todayISO(), days: S.days, pantry: S.pantry, shop: S.shop, log: S.log, settings: S.set, scans: S.scans, myFoods: S.myFoods, myRecipes: S.myRecipes};
   download(new Blob([JSON.stringify(data)], {type: 'application/json'}), 'routine-data-' + todayISO() + '.json');
 }
 async function applyImport(d) {
@@ -735,6 +906,8 @@ async function applyImport(d) {
   for (const e of (d.log || [])) { const { key, ...rest } = e; await dbPut('mealLog', key, rest); }
   await dbPut('kv', 'settings', d.settings || {plan: {}, basics: {}});
   await dbPut('kv', 'scans', d.scans || []);
+  await dbPut('kv', 'myFoods', d.myFoods || {});
+  await dbPut('kv', 'myRecipes', d.myRecipes || {});
   await loadAll();
 }
 function importJSON() {
@@ -797,6 +970,17 @@ const H = {
   jsonout() { exportJSON(); },
   jsonin() { importJSON(); },
   closesheet() { closeSheet(); },
+  photofood() { photoFood(); },
+  ffsave() { return saveFoodForm(); },
+  fflook() { return fillWithAI(); },
+  airecipe(d) { return aiRecipe(d.scope || 'mine'); },
+  async aisave() { const r = await saveAIRecipe(); if (r) { closeSheet(); toast('Saved to My recipes (Meals tab)'); render(); } },
+  async aicook() { const r = await saveAIRecipe(); if (!r) return; const d = todayISO(), slot = r.slots.includes(lastAI.slot) ? lastAI.slot : r.slots[0]; S.set.plan[d] = Object.assign({}, S.set.plan[d], {[slot]: r.id}); await saveSet(); closeSheet(); openCook(r.id, slot, d); },
+  async myfav(d) { const r = S.myRecipes[d.id]; r.fav = !r.fav; if (r.fav) r.slots = Array.from(new Set([...r.slots, ...(r.slots.some(x => x === 'lunch' || x === 'dinner') ? ['lunch', 'dinner'] : [])])); RECIPES[d.id] = r; await saveMyRecipes(); render(); },
+  async mydel(d) { if (!confirm('Delete this recipe?')) return; delete S.myRecipes[d.id]; delete RECIPES[d.id]; await saveMyRecipes(); for (const date of Object.keys(S.set.plan)) for (const sl of Object.keys(S.set.plan[date])) if (S.set.plan[date][sl] === d.id) delete S.set.plan[date][sl]; await saveSet(); render(); },
+  async aikeysave() { S.aiKey = $('#aikey').value.trim(); await dbPut('kv', 'aiKey', S.aiKey); toast(S.aiKey ? 'Key saved on this phone' : 'Key removed'); render(); },
+  async aikeydel() { S.aiKey = ''; await dbDel('kv', 'aiKey'); render(); },
+  async aitest() { const k = $('#aikey').value.trim(); if (k && k !== S.aiKey) { S.aiKey = k; await dbPut('kv', 'aiKey', k); } try { toast('Testing…'); const j = await aiCall([{text: 'Reply JSON only: {"ok": true}'}], 0); toast(j && j.ok ? 'The AI helper works' : 'Unexpected answer, but the key works'); } catch (e) { toast(e.message, true); } },
   howopen(d) { ui.open['h:' + d.id] = !ui.open['h:' + d.id]; render(); },
   ownpic(d) {
     const f = document.createElement('input'); f.type = 'file'; f.accept = 'image/*'; f.setAttribute('capture', 'environment');
@@ -842,7 +1026,8 @@ document.querySelectorAll('#nav button').forEach(b => b.onclick = () => { ui.mea
 (async () => {
   db = await openDB(); await loadAll();
   try { if (navigator.storage) { if (navigator.storage.persist) await navigator.storage.persist(); ui.persisted = navigator.storage.persisted ? await navigator.storage.persisted() : false; if (navigator.storage.estimate) { const e = await navigator.storage.estimate(); ui.est = (e.usage / 1048576).toFixed(1); } } } catch (e) {}
-  window.__app = {S, ui, promptByKey, prodUrls, promptMan, promptProd, PRODUCTS, AREAS, SUPPS, promptOf, sched, applyImport, exportData: () => ({app: 'routine', version: 2, exported: todayISO(), days: S.days, pantry: S.pantry, shop: S.shop, log: S.log, settings: S.set, scans: S.scans}),
+  window.__app = {S, ui, dbDel, openChange, handleFoodPhoto, promptByKey, prodUrls, promptMan, promptProd, PRODUCTS, AREAS, SUPPS, promptOf, sched, applyImport, exportData: () => ({app: 'routine', version: 2, exported: todayISO(), days: S.days, pantry: S.pantry, shop: S.shop, log: S.log, settings: S.set, scans: S.scans, myFoods: S.myFoods, myRecipes: S.myRecipes}),
+    aiRecipe, offLookup, upsertMyFood, saveAIRecipe, get lastAI() { return lastAI; }, set lastAI(v) { lastAI = v; },
     snapshot, targetLine, openScan, saveScan, show, render, loadAll, RECIPES, FOODS, todayISO, plannedId, missingOf, macros, have, H, get db() { return db; }, dbPut, reloadPhotos, setPantry};
   show('today');
   if ('serviceWorker' in navigator) {
