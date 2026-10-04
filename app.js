@@ -143,11 +143,11 @@ const ALIAS = {pantry: ['food', 'pantry'], shop: ['food', 'shop'], photos: ['pro
 function show(v) {
   if (ALIAS[v]) { const [vv, sub] = ALIAS[v]; if (vv === 'food') ui.food = sub; if (vv === 'progress') ui.prog = sub; v = vv; }
   ui.view = v;
-  document.querySelectorAll('#nav button').forEach(b => b.classList.toggle('on', b.dataset.v === v));
+  document.querySelectorAll('#nav button').forEach(b => b.classList.toggle('on', b.dataset.v === (v === 'prompts' ? 'more' : v)));
   render(); window.scrollTo(0, 0);
 }
 function render() {
-  const fn = {today: vToday, meals: vMeals, food: vFood, areas: vAreas, progress: vProgress, more: vBackup}[ui.view];
+  const fn = {today: vToday, meals: vMeals, food: vFood, areas: vAreas, progress: vProgress, more: vBackup, prompts: vPrompts}[ui.view];
   root.innerHTML = fn();
   if (ui.view === 'progress' && ui.prog === 'photos' && ui.pt === 'compare') bindCompare();
 }
@@ -400,6 +400,32 @@ async function weekFill() {
 
 
 // ---------- AREAS ----------
+
+const promptMan = id => MAN_PREFIX + PICS_TEXT[id].act + MAN_END;
+const promptProd = id => PROD_PREFIX + PICS_TEXT[id].pp + PROD_END;
+function picsRow(id) {
+  const pc = PICS[id] || {};
+  const box = (src, label) => src ? '<div style="background-image:url(' + esc(src) + ')"></div>' : '<div>' + label + '<br>(picture not added yet)</div>';
+  return '<div class="pics">' + box(pc.p, 'The product') + box(pc.m, 'How to use it') + '</div>';
+}
+function vPrompts() {
+  const done = S.set.picsDone || {};
+  let h = btn('go', '\u2190 Back', {v: 'more'}, 'sec sm') + '<h1 style="margin-top:12px">Picture prompts</h1><p class="sub">31 prompts for the Gemini app. Free, about an hour.</p>';
+  h += '<div class="card"><h2>How to do it</h2><ol class="st"><li>Open the <b>Gemini</b> app and start a new chat.</li><li>Copy prompt <b>#0</b>, paste it, send it. Save the picture of the man that comes back. If you do not like him, ask again.</li><li>For every <b>b</b> prompt: tap <b>+</b>, attach that saved picture of the man, then paste the prompt. This keeps the same man in all pictures.</li><li>The <b>a</b> prompts (the product) need no attachment.</li><li>Save each picture and send them to me in our chat with the number, for example \u201c3a\u201d and \u201c3b\u201d. Five products at a time is fine. I check them and put them into the app.</li><li>Tick a prompt here when you have the picture.</li></ol></div>';
+  const row = (key, label, text) => '<div class="card"><div class="row"><div class="grow"><span class="pnum">' + key + '</span><b>' + esc(label) + '</b></div>' + btn('picdone', done[key] ? '\u2713 Done' : 'Mark done', {key}, done[key] ? '' : 'sec sm') + '</div><div class="prompt">' + esc(text) + '</div>' + btn('copypic', 'Copy prompt', {key}, 'sec sm') + '</div>';
+  h += row('#0', 'The man (make this first)', MAN_REF_PROMPT);
+  PICS_ORDER.forEach((id, i) => {
+    const n = i + 1, nm = PRODUCTS[id].short;
+    h += row('#' + n + 'a', nm + ': the product', promptProd(id));
+    h += row('#' + n + 'b', nm + ': the man using it (attach #0)', promptMan(id));
+  });
+  return h;
+}
+function promptByKey(key) {
+  if (key === '#0') return MAN_REF_PROMPT;
+  const m = key.match(/^#(\d+)([ab])$/); const id = PICS_ORDER[Number(m[1]) - 1];
+  return m[2] === 'a' ? promptProd(id) : promptMan(id);
+}
 function stripFor(p) {
   if (p.onDemand) return '<div class="note">Only when a spot needs it.</div>';
   const t = todayISO(); let h = '<div class="wk">';
@@ -411,13 +437,19 @@ function prodCard(id) {
   const p = PRODUCTS[id], open = ui.open['p:' + id], d = todayISO(), on = !p.onDemand && p.days(sched(d), parse(d).getDay());
   let h = '<div class="card"><button class="tick" style="margin:0;border:0;background:transparent;padding:0" data-act="prodopen" data-id="' + id + '"><span class="grow"><div class="t">' + esc(p.short) + '</div><div class="h">' + esc(p.when) + '</div></span>' + (p.onDemand ? chip('as needed') : (on ? chip('Use today', 'ok') : chip('Not today', ''))) + '</button>';
   if (open) {
+    if (PICS_TEXT[id] && PICS[id]) h += picsRow(id);
     h += '<div class="sec-t">This week</div>' + stripFor(p);
     h += '<div class="sec-t">How to use it</div><ol class="st">' + p.steps.map(x => '<li>' + esc(x) + '</li>').join('') + '</ol>';
     h += '<div class="sec-t">When NOT to use it</div><ul class="st" style="list-style:disc">' + p.skip.map(x => '<li>' + esc(x) + '</li>').join('') + '</ul>';
     h += '<div class="sec-t">Buy it</div><div class="note">' + esc(p.n) + (p.price ? ' \u00b7 ~\u20ac' + p.price.toFixed(2) + ' (' + esc(p.priceNote) + ')' : ' \u00b7 ' + esc(p.priceNote)) + (p.where ? ' \u00b7 ' + esc(p.where) : '') + '</div>';
     if (p.url) h += '<a class="lnk" target="_blank" rel="noopener" href="' + esc(p.url) + '">Open the product page</a><br>';
     h += '<a class="lnk" target="_blank" rel="noopener" href="https://www.youtube.com/results?search_query=' + encodeURIComponent(p.search) + '">\u25b6 Search videos on how to do it</a>';
-    h += '<div class="sec-t">Picture prompt</div><div class="note">Paste this into any image generator to see the technique on a real-looking person. Use the steps above as the truth: AI pictures often get hands and amounts wrong.</div><div class="prompt">' + esc(promptOf(p)) + '</div>' + btn('copyprompt', 'Copy prompt', {id}, 'sec sm');
+    if (PICS_TEXT[id]) {
+      const n = PICS_ORDER.indexOf(id) + 1;
+      h += '<div class="sec-t">Pictures</div>' + picsRow(id) + '<div class="note">Prompts #' + n + 'a and #' + n + 'b. Make them in More \u203a Picture prompts. Trust the steps above over the picture: AI pictures can get amounts and hands wrong.</div>';
+    } else {
+      h += '<div class="sec-t">Picture prompt</div><div class="note">Paste this into any image generator. Use the steps above as the truth: AI pictures often get hands and amounts wrong.</div><div class="prompt">' + esc(promptOf(p)) + '</div>' + btn('copyprompt', 'Copy prompt', {id}, 'sec sm');
+    }
   }
   return h + '</div>';
 }
@@ -668,7 +700,7 @@ function vBackup() {
   return '<h1>Backup</h1><p class="sub">Everything lives only on this phone</p>' +
     '<div class="card"><div class="t">' + S.photos.length + ' photos' + (est ? ' · ' + est + ' MB used' : '') + '</div><div class="h" style="margin:6px 0 12px">' + (ui.persisted ? 'Storage is protected from being cleared by the phone.' : 'The phone could clear this storage if it runs very low on space. Make a backup now and then.') + '</div>' + btn('zip', 'Save all photos as a ZIP', {}, S.photos.length ? '' : '') + '<div class="note" style="margin-top:8px">Saves to your Downloads. Do this every Sunday.</div></div>' +
     '<div class="card"><div class="t">Meals, pantry, shopping, routine</div><div class="h" style="margin:6px 0 12px">One small file with everything except the photos.</div><div class="row" style="flex-wrap:wrap">' + btn('jsonout', 'Save data file', {}, '') + btn('jsonin', 'Restore from a data file', {}, 'sec') + '</div></div>' +
-    '<div class="card"><div class="t">Send to Claude</div><div class="h" style="margin:6px 0 12px">A short text summary of your streak, food, weight and scans to paste into the chat. No photos.</div>' + btn('snap', 'Make the summary', {}, '') + '</div>' + '<div class="card"><div class="t">Privacy</div><div class="h">Nothing is ever uploaded. There is no account and no server. Your photos and data exist only in this app on this phone, plus any file you save yourself.</div></div>';
+    '<div class="card"><div class="t">Picture prompts</div><div class="h" style="margin:6px 0 12px">31 prompts to make a picture of every face and hair product, and of a man using it, in the Gemini app.</div>' + btn('go', 'Open the prompts', {v: 'prompts'}, '') + '</div>' + '<div class="card"><div class="t">Send to Claude</div><div class="h" style="margin:6px 0 12px">A short text summary of your streak, food, weight and scans to paste into the chat. No photos.</div>' + btn('snap', 'Make the summary', {}, '') + '</div>' + '<div class="card"><div class="t">Privacy</div><div class="h">Nothing is ever uploaded. There is no account and no server. Your photos and data exist only in this app on this phone, plus any file you save yourself.</div></div>';
 }
 const crcT = (() => { const t = []; for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
 const crc32 = u8 => { let c = 0xFFFFFFFF; for (let i = 0; i < u8.length; i++) c = crcT[(c ^ u8[i]) & 255] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; };
@@ -762,6 +794,8 @@ const H = {
   jsonout() { exportJSON(); },
   jsonin() { importJSON(); },
   closesheet() { closeSheet(); },
+  async copypic(d) { const ok = await copyText(promptByKey(d.key)); toast(ok ? 'Prompt ' + d.key + ' copied' : 'Could not copy. Press and hold the text to copy it.', !ok); },
+  async picdone(d) { S.set.picsDone = Object.assign({}, S.set.picsDone, {[d.key]: !(S.set.picsDone || {})[d.key]}); await saveSet(); render(); },
   scanadd() { openScan(); },
   scango() { return saveScan(); },
   async scandel(d) { if (!confirm('Delete this scan?')) return; S.scans = S.scans.filter(x => x.date !== d.date); await saveScans(); render(); },
@@ -792,7 +826,7 @@ document.querySelectorAll('#nav button').forEach(b => b.onclick = () => { ui.mea
 (async () => {
   db = await openDB(); await loadAll();
   try { if (navigator.storage) { if (navigator.storage.persist) await navigator.storage.persist(); ui.persisted = navigator.storage.persisted ? await navigator.storage.persisted() : false; if (navigator.storage.estimate) { const e = await navigator.storage.estimate(); ui.est = (e.usage / 1048576).toFixed(1); } } } catch (e) {}
-  window.__app = {S, ui, PRODUCTS, AREAS, SUPPS, promptOf, sched, applyImport, exportData: () => ({app: 'routine', version: 2, exported: todayISO(), days: S.days, pantry: S.pantry, shop: S.shop, log: S.log, settings: S.set, scans: S.scans}),
+  window.__app = {S, ui, promptByKey, promptMan, promptProd, PRODUCTS, AREAS, SUPPS, promptOf, sched, applyImport, exportData: () => ({app: 'routine', version: 2, exported: todayISO(), days: S.days, pantry: S.pantry, shop: S.shop, log: S.log, settings: S.set, scans: S.scans}),
     snapshot, targetLine, openScan, saveScan, show, render, loadAll, RECIPES, FOODS, todayISO, plannedId, missingOf, macros, have, H, get db() { return db; }, dbPut, reloadPhotos, setPantry};
   show('today');
   if ('serviceWorker' in navigator) {

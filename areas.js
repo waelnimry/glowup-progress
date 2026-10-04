@@ -139,3 +139,30 @@ const SUPPS = [
   {n: 'Zinc', status: 'Doctor only', text: 'The best-studied supplement for acne, but also the one with the most side effects. Only if the Hausarzt agrees, and only after the Benzaknen and adapalene have had 8 to 12 weeks.'},
   {n: 'Skip these', status: 'No', text: 'High-dose vitamin B12 (can worsen acne). Biotin and hair gummies (no benefit unless you are deficient, and biotin can distort blood tests). Multivitamins and collagen (no benefit for you). Magnesium (not needed on a balanced diet, and high doses cause diarrhoea).'}
 ];
+
+// ---- Picture pairs (made-up man who looks similar to Wael + the product on white). Generated in the Gemini app. ----
+// #0 is made first; it is attached to every "man" prompt so the same man appears in all of them.
+const MAN_REF_PROMPT = 'Photorealistic head-and-shoulders portrait of a 23-year-old man with dense dark-brown curly hair (loose curls, medium length on top, shorter at the sides), thick dark straight eyebrows, dark brown eyes, light-olive skin and short even stubble, neutral friendly expression, plain white t-shirt, standing in a clean white bathroom, soft natural window light, vertical 3:4, sharp focus on the face, no text, no logos, no watermark.';
+const MAN_PREFIX = 'Use the man in the attached photo: same face, same curly hair, same skin and stubble. Photorealistic photo of him in a clean white bathroom with soft natural window light, ';
+const MAN_END = '. Framed close on the area being treated so it is obvious where the product goes. Vertical 3:4. No text, no labels, no logos, no watermark. Natural hands with five fingers.';
+const PROD_PREFIX = 'Photorealistic product photo of ';
+const PROD_END = ', standing upright on a plain white background, soft studio light, gentle shadow underneath, vertical 3:4, no readable text, no brand name, no logo, no watermark.';
+const PICS_TEXT = {
+  cleanser:   {pp: 'a white pump bottle of foaming facial cleanser with a blue pump and small blue details', act: 'massaging white foaming cleanser onto both cheeks with his fingertips in small circles, his face wet, eyes closed, the foam covering cheeks, forehead and chin but not his eyes'},
+  moist:      {pp: 'a small white tube of light face moisturiser with blue details', act: 'with five small dots of white moisturiser on his forehead, both cheeks, nose and chin, about to spread them upward with two fingers'},
+  spf:        {pp: 'a slim white tube of face sun cream, factor 50', act: 'holding up his index and middle finger toward the camera with a line of white sun cream running the full length of both fingers, which is the amount for face and neck'},
+  bpo:        {pp: 'a small white pharmacy tube of acne gel next to its folding box', act: 'dabbing a thin layer of clear gel onto his left cheek with one fingertip, the area covered is only the cheeks and the jawline, nothing near his eyes, nostrils or lips'},
+  patch:      {pp: 'a small sheet of clear round hydrocolloid pimple patches', act: 'pressing one small clear round patch onto a single spot on his cheek with his fingertip'},
+  lipbalm:    {pp: 'a lip balm stick with its cap off', act: 'swiping a lip balm stick across his lower lip, close-up of the lower half of his face'},
+  scraper:    {pp: 'a stainless steel U-shaped tongue scraper', act: 'holding a stainless steel U-shaped tongue scraper at the back of his extended tongue and pulling it forward, in front of a bathroom mirror'},
+  toothbrush: {pp: 'a black electric toothbrush with a round brush head standing on its charger', act: 'smiling with his teeth showing while holding a black electric toothbrush with the round head angled at 45 degrees against the gum line of his upper teeth'},
+  floss:      {pp: 'a small white dental floss dispenser with a strand of floss pulled out', act: 'gently curving dental floss in a C-shape around one of his lower front teeth, the floss wound around his two middle fingers, mouth open in front of a mirror'},
+  trimmer:    {pp: 'a black cordless beard trimmer with a short comb guard attached', act: 'running a beard trimmer with a short guard along his jawline, with two fingers of his other hand resting just above his Adam\'s apple to show where the neckline stops'},
+  shampoo:    {pp: 'a 400 ml bottle of curl shampoo', act: 'standing in a shower massaging shampoo foam into his scalp only with his fingertips, head tilted slightly forward, the lengths of his curls without foam'},
+  cond:       {pp: 'a 350 ml bottle of hair conditioner', act: 'in the shower spreading white conditioner through the lengths and ends of his wet curly hair and gently separating the curls with his fingers'},
+  leavein:    {pp: 'a large round tub of creamy leave-in hair cream with the lid off', act: 'with his head tipped forward over a sink, raking a coin-sized amount of white cream through his soaking-wet curly hair with his fingers'},
+  gel:        {pp: 'a clear squeeze tube of curl styling gel', act: 'scrunching gel upward into his wet curls with both palms cupped under the hair'},
+  towel:      {pp: 'a folded grey microfibre hair turban', act: 'with his wet curly hair wrapped on top of his head inside a grey cotton t-shirt tied at the forehead, looking into the mirror'}
+};
+// Only products used on the face, mouth and hair get picture pairs.
+const PICS_ORDER = ['cleanser', 'moist', 'spf', 'bpo', 'patch', 'lipbalm', 'scraper', 'toothbrush', 'floss', 'trimmer', 'shampoo', 'cond', 'leavein', 'gel', 'towel'];

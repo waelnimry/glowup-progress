@@ -1,7 +1,7 @@
 // Offline shell. Network first (so updates arrive on the next open), cache as the fallback.
 // Photos and data are never cached here; they live in IndexedDB on the phone.
-const V = 'routine-v4';
-const SHELL = ['./', './index.html', './app.js', './foods.js', './meals.js', './areas.js', './manifest.webmanifest', './icon-192.png', './icon-512.png'];
+const V = 'routine-v5';
+const SHELL = ['./', './index.html', './app.js', './foods.js', './meals.js', './areas.js', './pics.js', './manifest.webmanifest', './icon-192.png', './icon-512.png'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(V).then(c => c.addAll(SHELL)).then(() => self.skipWaiting())); });
 self.addEventListener('activate', e => { e.waitUntil(caches.keys().then(k => Promise.all(k.filter(x => x !== V).map(x => caches.delete(x)))).then(() => self.clients.claim())); });
 self.addEventListener('fetch', e => {
