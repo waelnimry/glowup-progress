@@ -25,11 +25,6 @@ const PRODUCTS = {
     steps: ['Wash your face with the cleanser and wait until the skin is completely dry.', 'Squeeze out about a pea-sized amount for the whole of both cheeks and the jaw.', 'Dot it on the cheeks and jaw only and spread it as a thin, almost invisible layer.', 'Wash your hands straight away.', 'Wait 10 minutes, then put on the moisturiser.'],
     skip: ['Never on eyes, lips, nostrils or broken skin.', 'Skip the night and use it only 2 times a week if the skin burns, peels hard or swells. If it keeps happening, stop and tell me.', 'No new acne product on the same night as this one, until we have talked about it.', 'It bleaches fabric: use an old white pillowcase and a towel you do not mind ruining.', 'Do not use it on a sunburn.'],
     search: 'how to apply benzoyl peroxide gel acne correctly', act: 'dabbing a thin layer of clear acne gel onto his cheek with a fingertip, other hand holding the tube'},
-  patch: {n: 'Hydrocolloid pimple patches', short: 'Pimple patches', price: 4, priceNote: 'est, not checked', where: 'dm or any pharmacy (look for "Pickel-Patches / hydrocolloid")', url: '',
-    when: 'Only on a spot that has come to a head, at night', days: () => false, onDemand: true,
-    steps: ['Wash your face and dry it completely.', 'Peel one patch off the sheet without touching the sticky side.', 'Press it flat on the single spot and hold for 10 seconds.', 'Leave it on overnight, or 6 to 8 hours. Remove it slowly.'],
-    skip: ['One patch for one spot. Never cover the whole face.', 'Do not squeeze the spot first or after.', 'Do not put Benzaknen under the patch.'],
-    search: 'how to use hydrocolloid pimple patch', act: 'pressing a small round pimple patch onto a spot on his cheek with a fingertip'},
   shampoo: {n: 'Balea Shampoo Locken beauty essentials, 400 ml', short: 'Curl shampoo', price: 2.45, priceNote: 'checked 19 Sep', where: 'dm', url: 'https://www.dm.de/p/d/3155276/balea-shampoo-locken-beauty-essentials',
     when: 'Wash days: Monday, Thursday, Saturday', days: s => s.wash,
     steps: ['Wet your hair fully with warm water.', 'Put a small amount in your palm and spread it on your scalp only.', 'Massage the scalp with your fingertips for one minute. Do not scrub the lengths.', 'Rinse. The suds running down are enough to clean the ends.'],
@@ -79,17 +74,59 @@ const PRODUCTS = {
     when: 'Every morning after the sun cream, and again when your lips feel dry', days: () => true,
     steps: ['After your sun cream, swipe the stick over both lips two or three times.', 'Press your lips together to spread it.', 'Reapply during the day when they feel dry.'],
     skip: ['Do not lick your lips, it dries them out more.'],
-    search: 'how to apply lip balm with spf', act: 'swiping a lip balm stick across his lower lip, close-up of the lower face'}
+    search: 'how to apply lip balm with spf', act: 'swiping a lip balm stick across his lower lip, close-up of the lower face'},
+  toothpaste: {n: 'Any toothpaste with 1450 ppm fluoride (for example Dontodent)', short: 'Toothpaste', price: 0.65, priceNote: 'est, not checked', where: 'dm or any supermarket', url: '',
+    when: 'Morning and evening, with the toothbrush', days: () => true,
+    steps: ['Put a pea-sized amount on the dry brush head.', 'Brush for 2 minutes, all surfaces.', 'Spit it out, but do not rinse with water: the fluoride keeps working.'],
+    skip: ['Skip charcoal and strong whitening pastes: they scratch the enamel.', 'Check the tube says 1450 ppm fluoride (some "natural" pastes have none).'],
+    search: 'how much toothpaste spit dont rinse fluoride', act: 'squeezing a pea-sized amount of toothpaste onto an electric toothbrush head'},
+  bodywash: {n: 'Your own body wash', short: 'Body wash', price: 0, priceNote: 'you own it', where: '', url: '',
+    when: 'Every shower (after the gym and in the evening)', days: () => true,
+    steps: ['Wet your body with warm, not hot, water.', 'Put a coin-sized amount in your hand or on a sponge.', 'Wash chest, back, armpits, groin and feet. Rinse well.', 'Pat dry with a towel.'],
+    skip: ['Do not use it on your face. The face has its own cleanser.', 'Very hot, long showers dry the skin out in winter.'],
+    search: 'how to shower properly body wash', act: 'lathering body wash on his chest and shoulders in the shower'},
+  deo: {n: 'Your own deodorant', short: 'Deodorant', price: 0, priceNote: 'you own it', where: '', url: '',
+    when: 'Every morning, on clean dry armpits. Again after the gym shower', days: () => true,
+    steps: ['Make sure your armpits are clean and completely dry.', 'Two or three strokes (or a two-second spray) under each arm.', 'Let it dry for a minute before you put your shirt on.'],
+    skip: ['Do not use it on freshly shaved or irritated skin, it stings.', 'If it gives you a rash, stop and switch to a fragrance-free one.'],
+    search: 'how to apply deodorant properly', act: 'applying stick deodorant to his armpit'},
+  bodylotion: {n: 'Balea Bodylotion Urea, 400 ml', short: 'Body lotion (winter)', price: 1.75, priceNote: 'checked 4 Oct', where: 'dm', url: 'https://www.dm.de/p/d/1574857/balea-bodylotion-urea',
+    when: 'After the shower, October to March, on dry areas', days: () => true,
+    steps: ['After the shower, pat your skin almost dry.', 'Put a coin-sized amount in your palm.', 'Rub it into dry areas: shins, arms, elbows, hands.', 'Let it sink in for a minute before you get dressed.'],
+    skip: ['Not on the face: the face has its own moisturiser.', 'Urea can sting on broken or scratched skin. Leave those spots out.'],
+    search: 'how to apply body lotion after shower dry skin', act: 'rubbing white body lotion into his forearm after a shower'}
+};
+
+// What each product has to do. Used by the photo comparison ("is mine as good?").
+const PRODUCT_ROLE = {
+  cleanser: 'a gentle face cleanser for oily, acne-prone skin: non-comedogenic, no scrub particles, no strong fragrance, not harsh or stripping',
+  moist: 'a light face moisturiser for oily, acne-prone skin: non-comedogenic, little or no fragrance; ceramides or niacinamide are a plus. Used morning and evening, also after benzoyl peroxide',
+  spf: 'a daily face sunscreen, SPF 50 with good UVA protection, light or matte, non-comedogenic, made for oily or acne-prone skin',
+  bpo: 'an acne treatment with benzoyl peroxide 2.5 to 5 %',
+  shampoo: 'a gentle, preferably sulfate-free shampoo for curly hair',
+  cond: 'a conditioner for curly hair that detangles and softens',
+  leavein: 'a leave-in conditioner or curl cream for curly hair against frizz',
+  gel: 'a styling gel for curls and waves, preferably alcohol-free, gives hold without crunch once scrunched out',
+  towel: 'a microfibre towel or a cotton T-shirt to dry curly hair without frizz (not a terry towel)',
+  trimmer: 'a beard trimmer with guards from about 1 to 5 mm',
+  toothbrush: 'an electric toothbrush (oscillating round head or sonic), ideally with a 2-minute timer and pressure sensor',
+  toothpaste: 'a toothpaste with about 1450 ppm fluoride, not charcoal and not strongly abrasive',
+  floss: 'dental floss or interdental brushes for daily cleaning between the teeth',
+  scraper: 'a tongue scraper (metal or plastic)',
+  lipbalm: 'a lip balm with SPF 30 to 50',
+  bodywash: 'a mild shower gel for the body that does not dry the skin out',
+  deo: 'a deodorant or antiperspirant that works for him and does not irritate the skin',
+  bodylotion: 'a body lotion for dry winter skin, ideally with urea 5 to 10 %'
 };
 
 // Order shown in the Products list
-const PRODUCT_ORDER = ['cleanser', 'moist', 'spf', 'bpo', 'patch', 'shampoo', 'cond', 'leavein', 'gel', 'towel', 'trimmer', 'toothbrush', 'floss', 'scraper', 'lipbalm'];
+const PRODUCT_ORDER = ['cleanser', 'moist', 'spf', 'bpo', 'shampoo', 'cond', 'leavein', 'gel', 'towel', 'trimmer', 'toothbrush', 'toothpaste', 'floss', 'scraper', 'lipbalm', 'bodywash', 'deo', 'bodylotion'];
 
 // Face and body areas. now = what the photos/assessment show. moves = what actually changes it. cant = honest limit.
 const AREAS = [
   {id: 'cheeks', group: 'Face', n: 'Cheeks', now: 'Mild-to-moderate acne on the cheeks and jaw, with red and brown marks where spots healed, and some shallow texture.', goal: 'Calmer in 8 to 12 weeks, marks fading over 3 to 6 months.',
-   moves: ['Benzaknen on the cheeks and jaw in the evening (the one over-the-counter acne drug with real evidence).', 'SPF 50 every single morning: the marks only fade if the sun does not darken them again.', 'Never pop spots. A pimple patch on a spot that has come to a head.', 'Ask the Hausarzt for adapalene gel or a dermatologist referral this week.', 'Losing fat slims the lower face and cheeks too.'],
-   products: ['cleanser', 'moist', 'spf', 'bpo', 'patch'], cant: 'The shallow texture is a separate dermatology conversation for later. It is not part of this budget.'},
+   moves: ['Benzaknen on the cheeks and jaw in the evening (the one over-the-counter acne drug with real evidence).', 'SPF 50 every single morning: the marks only fade if the sun does not darken them again.', 'Never pop spots: squeezing pushes it deeper and leaves a mark.', 'Ask the Hausarzt for adapalene gel or a dermatologist referral this week.', 'Losing fat slims the lower face and cheeks too.'],
+   products: ['cleanser', 'moist', 'spf', 'bpo'], cant: 'The shallow texture is a separate dermatology conversation for later. It is not part of this budget.'},
   {id: 'skin', group: 'Face', n: 'Skin overall', now: 'Combination to oily: shine on the nose and inner cheeks, enlarged pores there, drier at the edges.', goal: 'Even, calm skin that is no longer irritated.',
    moves: ['Four products only. More makes irritated skin worse.', 'Sleep 7 hours with a fixed wake-up time.', 'Water through the day and a clean pillowcase, changed weekly.'],
    products: ['cleanser', 'moist', 'spf'], cant: 'Skin type is genetic. The routine controls the oil and irritation, it does not change the type.'},
@@ -107,7 +144,7 @@ const AREAS = [
    products: ['scraper'], cant: 'A white coating that stays for more than two weeks is a question for the dentist.'},
   {id: 'teeth', group: 'Face', n: 'Teeth', now: 'Healthy gums, straight upper teeth, crowded lower teeth, moderate yellowing.', goal: 'Naturally brighter teeth by January.',
    moves: ['October: book the check-up and the professional cleaning (about €80 to €120; DAK refunds up to €60 a year).', 'Electric toothbrush twice a day and floss every evening.', 'Rinse with water after coffee and tea.', 'January: ask the dentist about custom-tray home bleaching (about €250 to €400).'],
-   products: ['toothbrush', 'floss'], cant: 'Shop whitening strips do almost nothing in the EU (the legal peroxide limit is 0.1 %). Skip charcoal and DIY: they scratch the enamel. The crowded lower teeth stay as they are.'},
+   products: ['toothbrush', 'toothpaste', 'floss'], cant: 'Shop whitening strips do almost nothing in the EU (the legal peroxide limit is 0.1 %). Skip charcoal and DIY: they scratch the enamel. The crowded lower teeth stay as they are.'},
   {id: 'hair', group: 'Face', n: 'Hair', now: 'Dense, dark 2c to 3a curls with no recession, but unshaped and frizzy.', goal: 'Defined curls with a better shape after the cut in Phase 2.',
    moves: ['The wash-day routine on Monday, Thursday and Saturday: shampoo on the scalp, conditioner on the ends, leave-in, gel, plop.', 'Never a brush on dry hair, never a terry towel.', 'Phase 2 (late October): a cutter who cuts curls dry, length on top, soft taper at the sides.'],
    products: ['shampoo', 'cond', 'leavein', 'gel', 'towel'], cant: 'The shape problem comes from the cut. Products only fix the frizz.'},
@@ -117,6 +154,9 @@ const AREAS = [
   {id: 'beard', group: 'Face', n: 'Beard and jaw', now: 'Good stubble density on the chin and moustache, thinner on the upper cheeks.', goal: 'A clean, even 3 to 5 mm stubble along the jaw.',
    moves: ['Trimmer with the guard on, Wednesday and Sunday.', 'No razor on the face.', 'Losing fat makes the jawline show.'],
    products: ['trimmer'], cant: 'The upper cheeks will not fill in yet. Reassess in a year or two.'},
+  {id: 'bodyskin', group: 'Body', n: 'Skin on the body', now: 'No problem seen. Winter heating dries the skin on the shins, arms and hands.', goal: 'Clean, soft skin and no smell, all winter.',
+   moves: ['Shower after every gym session, warm not hot.', 'Deodorant every morning on dry armpits.', 'Body lotion after the shower on the dry spots, October to March.'],
+   products: ['bodywash', 'deo', 'bodylotion'], cant: ''},
   {id: 'belly', group: 'Body', n: 'Belly', now: 'Fat is highest around the midsection, with faint stretch marks around the navel.', goal: 'Flat and visibly lean by 1 April, with abs showing around February to March.',
    moves: ['The strict menu: about 1,850 kcal a day with high protein.', '10,000 steps every day and 15 minutes of incline walking after each lift.', 'Core work is already in your sessions: plank on Lower A, hanging knee raises on Lower B.', 'Weigh in every Sunday and watch the trend, not one day.'],
    products: [], cant: 'You cannot burn fat from one spot. The belly is usually the last place it goes, around months 5 and 6. The stretch marks will fade but not vanish.'},
@@ -152,7 +192,6 @@ const PICS_TEXT = {
   moist:      {pp: 'a small white tube of light face moisturiser with blue details', act: 'with five small dots of white moisturiser on his forehead, both cheeks, nose and chin, about to spread them upward with two fingers'},
   spf:        {pp: 'a slim white tube of face sun cream, factor 50', act: 'holding up his index and middle finger toward the camera with a line of white sun cream running the full length of both fingers, which is the amount for face and neck'},
   bpo:        {pp: 'a small white pharmacy tube of acne gel next to its folding box', act: 'dabbing a thin layer of clear gel onto his left cheek with one fingertip, the area covered is only the cheeks and the jawline, nothing near his eyes, nostrils or lips'},
-  patch:      {pp: 'a small sheet of clear round hydrocolloid pimple patches', act: 'pressing one small clear round patch onto a single spot on his cheek with his fingertip'},
   lipbalm:    {pp: 'a lip balm stick with its cap off', act: 'swiping a lip balm stick across his lower lip, close-up of the lower half of his face'},
   scraper:    {pp: 'a stainless steel U-shaped tongue scraper', act: 'holding a stainless steel U-shaped tongue scraper at the back of his extended tongue and pulling it forward, in front of a bathroom mirror'},
   toothbrush: {pp: 'a black electric toothbrush with a round brush head standing on its charger', act: 'smiling with his teeth showing while holding a black electric toothbrush with the round head angled at 45 degrees against the gum line of his upper teeth'},
@@ -165,7 +204,7 @@ const PICS_TEXT = {
   towel:      {pp: 'a folded grey microfibre hair turban', act: 'with his wet curly hair wrapped on top of his head inside a grey cotton t-shirt tied at the forehead, looking into the mirror'}
 };
 // Only products used on the face, mouth and hair get picture pairs.
-const PICS_ORDER = ['cleanser', 'moist', 'spf', 'bpo', 'patch', 'lipbalm', 'scraper', 'toothbrush', 'floss', 'trimmer', 'shampoo', 'cond', 'leavein', 'gel', 'towel'];
+const PICS_ORDER = ['cleanser', 'moist', 'spf', 'bpo', 'lipbalm', 'scraper', 'toothbrush', 'floss', 'trimmer', 'shampoo', 'cond', 'leavein', 'gel', 'towel'];
 
 // Short rows for the card (WHEN comes from PRODUCTS.when, CAREFUL from the first skip rule).
 const CARD_INFO = {
@@ -173,7 +212,6 @@ const CARD_INFO = {
   moist:      {how: 'Pea-sized dots on forehead, cheeks, nose and chin, then spread upward.', order: 'After the cleanser. On Benzaknen nights: Benzaknen, wait 10 minutes, then this.'},
   spf:        {how: 'Two finger-lengths for face and neck, spread evenly.', order: 'Morning, last: cleanser \u2192 moisturiser \u2192 sun cream \u2192 lip balm.'},
   bpo:        {how: 'Pea-sized amount, a thin layer on the cheeks and jaw only.', order: 'Evening: cleanser \u2192 skin fully dry \u2192 Benzaknen \u2192 wait 10 minutes \u2192 moisturiser.'},
-  patch:      {how: 'One patch on one spot that has come to a head, left on overnight.', order: 'Evening, after the moisturiser.'},
   lipbalm:    {how: 'Two or three swipes over both lips, press them together.', order: 'Morning after the sun cream, then whenever your lips feel dry.'},
   scraper:    {how: '3 to 5 light strokes from the back of the tongue to the front.', order: 'Morning, before drinking and before brushing.'},
   toothbrush: {how: 'Head at 45 degrees to the gum line, 2 minutes, let the brush do the work.', order: 'Morning after the tongue scraper; evening after flossing.'},
@@ -183,5 +221,9 @@ const CARD_INFO = {
   cond:       {how: 'Mid-lengths to ends, detangle with your fingers, rinse.', order: 'Right after the shampoo.'},
   leavein:    {how: 'Coin-sized amount on soaking-wet hair, head tipped forward.', order: 'Straight out of the shower, after the conditioner.'},
   gel:        {how: 'Same amount as the leave-in, scrunched upward. Do not touch it while it dries.', order: 'Right after the leave-in.'},
-  towel:      {how: 'Plop the curls into it for 10 minutes, then let the hair air-dry.', order: 'Last, straight after the gel.'}
+  towel:      {how: 'Plop the curls into it for 10 minutes, then let the hair air-dry.', order: 'Last, straight after the gel.'},
+  toothpaste: {how: 'Pea-sized amount, 2 minutes, spit but do not rinse.', order: 'After the tongue scraper and the floss.'},
+  bodywash:   {how: 'Coin-sized amount, wash, rinse well.', order: 'In the shower. The face gets its own cleanser.'},
+  deo:        {how: 'Two or three strokes per armpit on clean, dry skin.', order: 'After the shower, before your shirt.'},
+  bodylotion: {how: 'Coin-sized amount on the dry spots: shins, arms, hands.', order: 'Straight after the shower, skin almost dry.'}
 };

@@ -44,7 +44,7 @@ const dbEntries = store => new Promise((res, rej) => {
   c.onerror = () => rej(c.error);
 });
 
-const S = { days: {}, pantry: {}, shop: {}, log: [], set: {plan: {}, basics: {}}, photos: [], scans: [], prod: {}, myFoods: {}, myRecipes: {}, aiKey: '' };
+const S = { days: {}, pantry: {}, shop: {}, log: [], set: {plan: {}, basics: {}}, photos: [], scans: [], prod: {}, mine: {}, myFoods: {}, myRecipes: {}, aiKey: '' };
 const ui = { view: 'today', mealsDate: null, open: {}, pt: 'take', tlSlot: 'face', cmpSlot: 'face', food: 'pantry', prog: 'photos', areas: 'face' };
 const LINE_START = '2026-10-04', HOLD_SUNDAYS = ['2026-11-22'], WEEKS = 26;
 
@@ -59,6 +59,7 @@ async function loadAll() {
   S.set = Object.assign({plan: {}, basics: {}}, kv ? kv.v : {});
   const kvAll = await dbEntries('kv'); const sc = kvAll.find(e => e.k === 'scans'); S.scans = sc ? sc.v : [];
   S.prod = {}; for (const e of kvAll) if (typeof e.k === 'string' && e.k.startsWith('prod:')) S.prod[e.k.slice(5)] = e.v;
+  S.mine = {}; for (const e of kvAll) if (typeof e.k === 'string' && e.k.startsWith('mine:') && PRODUCTS[e.k.slice(5)]) S.mine[e.k.slice(5)] = e.v;
   const kvv = k => { const e = kvAll.find(x => x.k === k); return e ? e.v : null; };
   S.myFoods = kvv('myFoods') || {}; S.myRecipes = kvv('myRecipes') || {}; S.aiKey = kvv('aiKey') || '';
   // migrate: custom items used to live only in the pantry and vanished at 0 g
@@ -452,12 +453,15 @@ function picPair(id) {
   let right = '<div><div class="tile man">' + (pc.m ? '<img alt="How to use it" src="' + esc(pc.m) + '">' : '<span>Picture #' + n + '<br>not made yet</span>') + '</div><div class="cap">' + (pc.m ? 'How to use it' : 'More \u203a Picture prompts') + '</div></div>';
   return '<div class="pair">' + left + right + '</div>' + (pc.note && !own ? '<div class="note">' + esc(pc.note) + '</div>' : '');
 }
+const usingMine = id => !!(S.mine[id] && S.mine[id].use);
+const pname = id => usingMine(id) ? S.mine[id].n : PRODUCTS[id].n;
 function prodCard(id) {
   const p = PRODUCTS[id], open = ui.open['p:' + id], how = ui.open['h:' + id], d = todayISO(), on = !p.onDemand && p.days(sched(d), parse(d).getDay()), ci = CARD_INFO[id] || {};
-  let h = '<div class="card"><button class="tick" style="margin:0;border:0;background:transparent;padding:0" data-act="prodopen" data-id="' + id + '"><span class="grow"><div class="t">' + esc(p.short) + '</div><div class="h">' + esc(p.n) + '</div></span>' + (p.onDemand ? chip('as needed') : (on ? chip('Use today', 'ok') : chip('Not today', ''))) + '</button>';
+  let h = '<div class="card"><button class="tick" style="margin:0;border:0;background:transparent;padding:0" data-act="prodopen" data-id="' + id + '"><span class="grow"><div class="t">' + esc(p.short) + '</div><div class="h">' + (usingMine(id) ? '\u2713 Yours: ' : '') + esc(pname(id)) + '</div></span>' + (p.onDemand ? chip('as needed') : (on ? chip('Use today', 'ok') : chip('Not today', ''))) + '</button>';
   if (open) {
-    h += '<div class="price">' + esc(p.where ? p.where.split(/[.(]/)[0].trim() : '') + (p.price ? ' \u00b7 ~' + p.price.toFixed(2) + ' EUR' : '') + ' <span class="note">(' + esc(p.priceNote) + ')</span></div>';
+    h += usingMine(id) ? '<div class="price">Your own product <span class="note">(you already have it)</span></div>' : '<div class="price">' + esc(p.where ? p.where.split(/[.(]/)[0].trim() : '') + (p.price ? ' \u00b7 ~' + p.price.toFixed(2) + ' EUR' : '') + ' <span class="note">(' + esc(p.priceNote) + ')</span></div>';
     if (PICS_TEXT[id]) h += picPair(id);
+    h += cmpBlock(id);
     h += '<div class="info"><div class="lab">WHEN</div><div>' + esc(p.when) + '</div><div class="lab">HOW</div><div>' + esc(ci.how || '') + '</div><div class="lab">ORDER</div><div>' + esc(ci.order || '') + '</div><div class="lab">CAREFUL</div><div><b>' + esc(p.skip[0]) + '</b></div></div>';
     h += btn('howopen', (how ? '\u25bc' : '\u25b6') + ' How to use it', {id}, 'ghost');
     if (how) {
@@ -489,7 +493,9 @@ function vAreas() {
   if (ui.areas === 'face' || ui.areas === 'body') h += AREAS.filter(a => a.group.toLowerCase() === ui.areas).map(areaCard).join('');
   else if (ui.areas === 'products') {
     let total = 0; for (const id of PRODUCT_ORDER) total += PRODUCTS[id].price || 0;
-    h += '<p class="note">All ' + PRODUCT_ORDER.length + ' products you use, with the days. Total if you bought everything new: about \u20ac' + total.toFixed(0) + '.</p>' + PRODUCT_ORDER.map(prodCard).join('');
+    h += '<p class="note">All ' + PRODUCT_ORDER.length + ' products you use, with the days. Total if you bought everything new: about \u20ac' + total.toFixed(0) + '.</p>' +
+      '<div class="card"><div class="t">Already have something?</div><div class="h" style="margin:6px 0 10px">Take a photo of a product you own. The AI tells you which step it fits and whether it is as good as the one recommended here. Tip: a photo of the back, where the ingredients are, gives the best answer.</div>' + btn('cmpscan', 'Scan a product I own', {}, '') + '</div>' +
+      PRODUCT_ORDER.map(prodCard).join('');
   } else {
     h += '<p class="note">What the evidence supports for health and skin. Nothing here is started without the Hausarzt visit.</p>' + SUPPS.map(x => '<div class="card"><div class="row"><div class="t grow">' + esc(x.n) + '</div>' + chip(esc(x.status), x.status === 'No' ? 'no' : (x.status === 'Optional' ? '' : 'dn')) + '</div><div class="note" style="margin-top:6px">' + esc(x.text) + '</div></div>').join('');
   }
@@ -868,6 +874,89 @@ function vAI() {
     '<div class="note" style="margin-top:8px">Barcode photos work without a key: they use the free Open Food Facts database.</div></div>';
 }
 
+
+// ====================== compare a product I own with the recommended one ======================
+const SKIN_PROFILE = 'Man, 23, in Germany. Face: combination-to-oily, acne-prone skin with red and brown marks from old spots; uses a 5 % benzoyl peroxide gel in the evening. Hair: dense dark 2c to 3a curls, washed three times a week. Healthy teeth and gums.';
+const VERDICT = {
+  yours_better: ['Yours is better', 'ok', 'Keep yours. No need to buy the recommended one.'],
+  equal: ['Yours is just as good', 'ok', 'Keep yours. It does the same job, so save the money.'],
+  recommended_better: ['The recommended one is better', '', 'Yours works, but the recommended one suits your skin or hair better. Use yours up first, then switch.'],
+  wrong_type: ['Not the right kind of product', 'no', 'This is a different kind of product, so it cannot replace this step.']
+};
+let lastCmp = null;
+function cmpBlock(id) {
+  const m = S.mine[id];
+  if (!m) return '<div class="row" style="margin:8px 0;flex-wrap:wrap;gap:8px">' + btn('cmpone', 'Compare with what I have (photo)', {id}, 'sec sm') + '</div>';
+  const v = VERDICT[m.verdict] || VERDICT.equal, own = !PICS_TEXT[id] && m.use ? ownUrl(id) : null;
+  let h = '<div class="info" style="display:block"><div class="lab">YOUR PRODUCT</div><div style="margin:4px 0 6px"><b>' + esc(m.n) + '</b> ' + chip(v[0], v[1]) + '</div>';
+  if (own) h += '<img alt="Your product" src="' + esc(own) + '" style="max-width:120px;border-radius:10px;margin:4px 0">';
+  h += '<ul class="st" style="list-style:disc;margin:4px 0">' + (m.why || []).map(x => '<li>' + esc(x) + '</li>').join('') + '</ul>';
+  if (m.watch) h += '<div class="note"><b>Watch out:</b> ' + esc(m.watch) + '</div>';
+  h += '<div class="note">Checked by the AI on ' + esc(m.date) + ' from your photo' + (m.label ? ' and the ingredient list' : ', without the ingredient list') + '. It is a reading of the label, not a lab test.</div>';
+  h += '<div class="row" style="margin-top:8px;flex-wrap:wrap;gap:6px">' + (m.verdict !== 'wrong_type' ? (m.use ? btn('mineuse', 'Switch back to the recommended one', {id, use: '0'}, 'sec sm') : btn('mineuse', 'Use mine in my routine', {id, use: '1'}, 'sec sm')) : '') + btn('cmpone', 'Compare again', {id}, 'sec sm') + btn('minedel', 'Forget it', {id}, 'sec sm') + '</div></div>';
+  return h;
+}
+async function bitmapBlob(bitmap) {
+  const k = Math.min(1, 900 / Math.max(bitmap.width, bitmap.height)), cv = document.createElement('canvas');
+  cv.width = Math.round(bitmap.width * k); cv.height = Math.round(bitmap.height * k); cv.getContext('2d').drawImage(bitmap, 0, 0, cv.width, cv.height);
+  return new Promise(r => cv.toBlob(r, 'image/jpeg', 0.86));
+}
+function cmpPhoto(id) {
+  if (!S.aiKey) return toast('The comparison needs the AI helper. Add a key in More \u203a AI helper.', true);
+  const f = document.createElement('input'); f.type = 'file'; f.accept = 'image/*'; f.setAttribute('capture', 'environment');
+  f.onchange = () => { if (f.files[0]) handleProdPhoto(f.files[0], id); };
+  f.click();
+}
+async function handleProdPhoto(file, id) {
+  if (!S.aiKey) return toast('The comparison needs the AI helper. Add a key in More \u203a AI helper.', true);
+  toast('The AI is looking at your product\u2026');
+  try {
+    const {bitmap, b64} = await imgToBase64(file);
+    const blob = await bitmapBlob(bitmap);
+    const slots = PRODUCT_ORDER.map(k => '- "' + k + '" (' + PRODUCTS[k].short + '): ' + PRODUCT_ROLE[k] + '. Recommended: ' + PRODUCTS[k].n).join('\n');
+    const task = id
+      ? 'His routine step "' + PRODUCTS[id].short + '" needs ' + PRODUCT_ROLE[id] + '. The product recommended for it is: ' + PRODUCTS[id].n + '.\nCompare the product in the photo with that recommendation for HIS skin and hair.'
+      : 'His routine has these steps:\n' + slots + '\nDecide which ONE step the product in the photo belongs to ("slot", or null if none), then compare it with the recommendation for that step.';
+    const prompt = 'You are a careful, honest advisor for skin, hair and dental care. The person: ' + SKIN_PROFILE + '\n' + task + '\n' +
+      'Read the brand, the product name and, if visible, the ingredient list. Judge only what you can see or reliably know about this exact product. ' +
+      'Use "equal" when his product does the job well: do not push him to buy something new without a real reason. Use "wrong_type" when it is a different kind of product. ' +
+      'Write "why" as 2 to 4 short sentences in plain everyday English, no chemistry words without a short explanation.\n' +
+      'Reply JSON only: {"is_product": boolean, "slot": ' + (id ? '"' + id + '"' : 'string or null') + ', "name": string, "brand": string or null, "verdict": "yours_better" | "equal" | "recommended_better" | "wrong_type", "why": [string], "watch_out": string or null, "read_ingredients": boolean}';
+    const j = await aiCall([{inline_data: {mime_type: 'image/jpeg', data: b64}}, {text: prompt}], 0.2);
+    if (j.is_product === false) return toast('The AI could not see a care product in this photo. Try again with the product filling the picture.', true);
+    const slot = id || (PRODUCTS[j.slot] ? j.slot : null);
+    const name = String(j.name || 'Your product').slice(0, 80) + (j.brand && !String(j.name || '').toLowerCase().includes(String(j.brand).toLowerCase()) ? ' (' + j.brand + ')' : '');
+    if (!slot) return toast(name + ' does not match any step in your routine.', true);
+    lastCmp = {id: slot, blob, data: {n: name, verdict: VERDICT[j.verdict] ? j.verdict : 'equal', why: (Array.isArray(j.why) ? j.why : []).map(String).slice(0, 4), watch: j.watch_out ? String(j.watch_out) : '', label: !!j.read_ingredients, date: todayISO(), use: false}};
+    showCmp();
+  } catch (e) { toast(e.message, true); }
+}
+function showCmp() {
+  const c = lastCmp, d = c.data, v = VERDICT[d.verdict], p = PRODUCTS[c.id];
+  let h = '<h2>' + esc(d.n) + '</h2><p class="note">For your step: <b>' + esc(p.short) + '</b>. Recommended: ' + esc(p.n) + '</p>';
+  h += '<div style="margin:8px 0">' + chip(v[0], v[1]) + '</div><p>' + esc(v[2]) + '</p>';
+  h += '<ul class="st" style="list-style:disc">' + d.why.map(x => '<li>' + esc(x) + '</li>').join('') + '</ul>';
+  if (d.watch) h += '<p class="note"><b>Watch out:</b> ' + esc(d.watch) + '</p>';
+  if (!d.label) h += '<p class="note">The AI could not read the ingredient list, so this is based on the product name. A photo of the back gives a better answer.</p>';
+  h += '<div class="row" style="margin-top:12px;flex-wrap:wrap;gap:8px">' + (d.verdict !== 'wrong_type' ? btn('cmpsave', 'Use mine in my routine', {use: '1'}, '') + btn('cmpsave', 'Keep the recommended one', {use: '0'}, 'sec') : '') + btn('closesheet', 'Close', {}, 'sec') + '</div>';
+  sheet(h);
+}
+async function saveCmp(use) {
+  const c = lastCmp; if (!c) return;
+  c.data.use = use && c.data.verdict !== 'wrong_type';
+  S.mine[c.id] = c.data; await dbPut('kv', 'mine:' + c.id, c.data);
+  if (c.data.use) { await dbPut('kv', 'prod:' + c.id, c.blob); S.prod[c.id] = c.blob; prodUrls.delete(c.id); c.data.photo = true; await dbPut('kv', 'mine:' + c.id, c.data); }
+  ui.open['p:' + c.id] = true; ui.areas = 'products'; closeSheet();
+  toast(c.data.use ? 'Done: your ' + PRODUCTS[c.id].short.toLowerCase() + ' is now in your routine' : 'Saved. The recommended one stays in your routine');
+  lastCmp = null; render();
+}
+async function setMineUse(id, use) {
+  const m = S.mine[id]; if (!m) return;
+  m.use = use;
+  if (!use && m.photo) { await dbDel('kv', 'prod:' + id); delete S.prod[id]; prodUrls.delete(id); m.photo = false; }
+  await dbPut('kv', 'mine:' + id, m); render();
+}
+
 // ---------- BACKUP ----------
 function vBackup() {
   const est = ui.est;
@@ -894,7 +983,7 @@ async function makeZip() {
   download(new Blob([...parts, ...cd, end], {type: 'application/zip'}), 'routine-photos-' + todayISO() + '.zip');
 }
 function exportJSON() {
-  const data = {app: 'routine', version: 2, exported: todayISO(), days: S.days, pantry: S.pantry, shop: S.shop, log: S.log, settings: S.set, scans: S.scans, myFoods: S.myFoods, myRecipes: S.myRecipes};
+  const data = {app: 'routine', version: 2, exported: todayISO(), days: S.days, pantry: S.pantry, shop: S.shop, log: S.log, settings: S.set, scans: S.scans, myFoods: S.myFoods, myRecipes: S.myRecipes, mine: S.mine};
   download(new Blob([JSON.stringify(data)], {type: 'application/json'}), 'routine-data-' + todayISO() + '.json');
 }
 async function applyImport(d) {
@@ -908,6 +997,7 @@ async function applyImport(d) {
   await dbPut('kv', 'scans', d.scans || []);
   await dbPut('kv', 'myFoods', d.myFoods || {});
   await dbPut('kv', 'myRecipes', d.myRecipes || {});
+  for (const [k, v] of Object.entries(d.mine || {})) if (PRODUCTS[k]) await dbPut('kv', 'mine:' + k, Object.assign({}, v, {photo: false}));
   await loadAll();
 }
 function importJSON() {
@@ -981,6 +1071,11 @@ const H = {
   async aikeysave() { S.aiKey = $('#aikey').value.trim(); await dbPut('kv', 'aiKey', S.aiKey); toast(S.aiKey ? 'Key saved on this phone' : 'Key removed'); render(); },
   async aikeydel() { S.aiKey = ''; await dbDel('kv', 'aiKey'); render(); },
   async aitest() { const k = $('#aikey').value.trim(); if (k && k !== S.aiKey) { S.aiKey = k; await dbPut('kv', 'aiKey', k); } try { toast('Testing…'); const j = await aiCall([{text: 'Reply JSON only: {"ok": true}'}], 0); toast(j && j.ok ? 'The AI helper works' : 'Unexpected answer, but the key works'); } catch (e) { toast(e.message, true); } },
+  cmpone(d) { cmpPhoto(d.id); },
+  cmpscan() { cmpPhoto(null); },
+  cmpsave(d) { return saveCmp(d.use === '1'); },
+  mineuse(d) { return setMineUse(d.id, d.use === '1'); },
+  async minedel(d) { await setMineUse(d.id, false); delete S.mine[d.id]; await dbDel('kv', 'mine:' + d.id); render(); },
   howopen(d) { ui.open['h:' + d.id] = !ui.open['h:' + d.id]; render(); },
   ownpic(d) {
     const f = document.createElement('input'); f.type = 'file'; f.accept = 'image/*'; f.setAttribute('capture', 'environment');
@@ -1026,7 +1121,8 @@ document.querySelectorAll('#nav button').forEach(b => b.onclick = () => { ui.mea
 (async () => {
   db = await openDB(); await loadAll();
   try { if (navigator.storage) { if (navigator.storage.persist) await navigator.storage.persist(); ui.persisted = navigator.storage.persisted ? await navigator.storage.persisted() : false; if (navigator.storage.estimate) { const e = await navigator.storage.estimate(); ui.est = (e.usage / 1048576).toFixed(1); } } } catch (e) {}
-  window.__app = {S, ui, dbDel, openChange, handleFoodPhoto, promptByKey, prodUrls, promptMan, promptProd, PRODUCTS, AREAS, SUPPS, promptOf, sched, applyImport, exportData: () => ({app: 'routine', version: 2, exported: todayISO(), days: S.days, pantry: S.pantry, shop: S.shop, log: S.log, settings: S.set, scans: S.scans, myFoods: S.myFoods, myRecipes: S.myRecipes}),
+  window.__app = {S, ui, dbDel, openChange, handleFoodPhoto, promptByKey, prodUrls, promptMan, promptProd, PRODUCTS, AREAS, SUPPS, promptOf, sched, applyImport, exportData: () => ({app: 'routine', version: 2, exported: todayISO(), days: S.days, pantry: S.pantry, shop: S.shop, log: S.log, settings: S.set, scans: S.scans, myFoods: S.myFoods, myRecipes: S.myRecipes, mine: S.mine}),
+    handleProdPhoto, saveCmp, setMineUse, get lastCmp() { return lastCmp; },
     aiRecipe, offLookup, upsertMyFood, saveAIRecipe, get lastAI() { return lastAI; }, set lastAI(v) { lastAI = v; },
     snapshot, targetLine, openScan, saveScan, show, render, loadAll, RECIPES, FOODS, todayISO, plannedId, missingOf, macros, have, H, get db() { return db; }, dbPut, reloadPhotos, setPantry};
   show('today');
