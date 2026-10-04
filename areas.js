@@ -166,3 +166,22 @@ const PICS_TEXT = {
 };
 // Only products used on the face, mouth and hair get picture pairs.
 const PICS_ORDER = ['cleanser', 'moist', 'spf', 'bpo', 'patch', 'lipbalm', 'scraper', 'toothbrush', 'floss', 'trimmer', 'shampoo', 'cond', 'leavein', 'gel', 'towel'];
+
+// Short rows for the card (WHEN comes from PRODUCTS.when, CAREFUL from the first skip rule).
+const CARD_INFO = {
+  cleanser:   {how: 'Pea-sized amount, massage 30 seconds with your fingertips, rinse, pat dry.', order: 'First step, morning and evening.'},
+  moist:      {how: 'Pea-sized dots on forehead, cheeks, nose and chin, then spread upward.', order: 'After the cleanser. On Benzaknen nights: Benzaknen, wait 10 minutes, then this.'},
+  spf:        {how: 'Two finger-lengths for face and neck, spread evenly.', order: 'Morning, last: cleanser \u2192 moisturiser \u2192 sun cream \u2192 lip balm.'},
+  bpo:        {how: 'Pea-sized amount, a thin layer on the cheeks and jaw only.', order: 'Evening: cleanser \u2192 skin fully dry \u2192 Benzaknen \u2192 wait 10 minutes \u2192 moisturiser.'},
+  patch:      {how: 'One patch on one spot that has come to a head, left on overnight.', order: 'Evening, after the moisturiser.'},
+  lipbalm:    {how: 'Two or three swipes over both lips, press them together.', order: 'Morning after the sun cream, then whenever your lips feel dry.'},
+  scraper:    {how: '3 to 5 light strokes from the back of the tongue to the front.', order: 'Morning, before drinking and before brushing.'},
+  toothbrush: {how: 'Head at 45 degrees to the gum line, 2 minutes, let the brush do the work.', order: 'Morning after the tongue scraper; evening after flossing.'},
+  floss:      {how: 'Curve it into a C around each tooth and slide it up and down.', order: 'Evening, before brushing.'},
+  trimmer:    {how: '3 to 4 mm guard everywhere; neckline two fingers above the Adam\'s apple.', order: 'On a dry beard before you shower, so the hairs wash away.'},
+  shampoo:    {how: 'Small amount on the scalp only, massage for one minute.', order: 'Wash day: shampoo \u2192 conditioner \u2192 leave-in \u2192 gel \u2192 turban.'},
+  cond:       {how: 'Mid-lengths to ends, detangle with your fingers, rinse.', order: 'Right after the shampoo.'},
+  leavein:    {how: 'Coin-sized amount on soaking-wet hair, head tipped forward.', order: 'Straight out of the shower, after the conditioner.'},
+  gel:        {how: 'Same amount as the leave-in, scrunched upward. Do not touch it while it dries.', order: 'Right after the leave-in.'},
+  towel:      {how: 'Plop the curls into it for 10 minutes, then let the hair air-dry.', order: 'Last, straight after the gel.'}
+};

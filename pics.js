@@ -1,2 +1,11 @@
-// Which pictures exist. Filled in as the images arrive: PICS.cleanser = {p: 'pics/cleanser-p.jpg', m: 'pics/cleanser-m.jpg'}
-const PICS = {};
+// Pictures that exist in the app.
+// p = real product photo, m = the man using it (made in Gemini from prompt #n).
+// Product photos: Open Beauty Facts contributors, licence CC BY-SA 3.0 (openbeautyfacts.org). Resized only.
+const OBF = 'Photo: Open Beauty Facts, CC BY-SA 3.0';
+const PICS = {
+  cleanser: {p: 'pics/cleanser-p.jpg', credit: OBF},
+  moist:    {p: 'pics/moist-p.jpg', credit: OBF, note: 'This is the CeraVe PM lotion. The pack at dm may look slightly different.'},
+  lipbalm:  {p: 'pics/lipbalm-p.jpg', credit: OBF},
+  floss:    {p: 'pics/floss-p.jpg', credit: OBF},
+  leavein:  {p: 'pics/leavein-p.jpg', credit: OBF}
+};
