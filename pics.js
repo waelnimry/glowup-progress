@@ -4,7 +4,7 @@
 const OBF = 'Photo: Open Beauty Facts, CC BY-SA 3.0';
 const PICS = {
   cleanser: {p: 'pics/cleanser-p.jpg', credit: OBF, steps: ['pics/cleanser-s1.jpg', 'pics/cleanser-s2.jpg', 'pics/cleanser-s3.jpg', 'pics/cleanser-s4.jpg']},
-  moist:    {p: 'pics/moist-p.jpg', credit: OBF, note: 'This is the CeraVe PM lotion. The pack at dm may look slightly different.'},
+  moist:    {p: 'pics/moist-p.jpg', credit: OBF, note: 'This is the CeraVe PM lotion. The pack at dm may look slightly different.', steps: ['pics/moist-s1.jpg', 'pics/moist-s2.jpg', 'pics/moist-s3.jpg', 'pics/moist-s4.jpg']},
   lipbalm:  {p: 'pics/lipbalm-p.jpg', credit: OBF},
   floss:    {p: 'pics/floss-p.jpg', credit: OBF},
   leavein:  {p: 'pics/leavein-p.jpg', credit: OBF}
