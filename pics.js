@@ -3,7 +3,7 @@
 // Product photos: Open Beauty Facts contributors, licence CC BY-SA 3.0 (openbeautyfacts.org). Resized only.
 const OBF = 'Photo: Open Beauty Facts, CC BY-SA 3.0';
 const PICS = {
-  cleanser: {p: 'pics/cleanser-p.jpg', credit: OBF},
+  cleanser: {p: 'pics/cleanser-p.jpg', credit: OBF, steps: ['pics/cleanser-s1.jpg', 'pics/cleanser-s2.jpg', 'pics/cleanser-s3.jpg', 'pics/cleanser-s4.jpg']},
   moist:    {p: 'pics/moist-p.jpg', credit: OBF, note: 'This is the CeraVe PM lotion. The pack at dm may look slightly different.'},
   lipbalm:  {p: 'pics/lipbalm-p.jpg', credit: OBF},
   floss:    {p: 'pics/floss-p.jpg', credit: OBF},
