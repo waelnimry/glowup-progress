@@ -1016,7 +1016,7 @@ const RECIPES = {
  }
 };
 // Default plan: fixed breakfast / pre-gym / night, and lunch + dinner by weekday (0 = Sunday).
-const ROTATION = {"breakfast":"b_quark","pre":"p_quark","night":"n_quark","lunch":{"0":"l0","1":"l1","2":"l2","3":"l3","4":"l4","5":"l5","6":"l6"},"dinner":{"0":"d0","1":"d1","2":"d2","3":"d3","4":"d4","5":"d5","6":"d6"}};
+const ROTATION = {"breakfast":"b_quark","pre":"p_quark","night":"n_quark","lunch":{"0":"l0","1":"l1","2":"l2","3":"l3","4":"l4","5":"l5","6":"l6"},"dinner":{"0":"d0","1":"d1","2":"d2","3":"x_salmon_rice","4":"d4","5":"x_salmon_potato","6":"d6"}};
 const SLOTS = [
   {id:'breakfast', label:'Breakfast', time:'07:30', kcal:380, p:38},
   {id:'lunch',     label:'Lunch',     time:'13:00', kcal:460, p:49},
