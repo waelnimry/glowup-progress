@@ -243,7 +243,7 @@ const RECIPES = {
    ]
   ],
   "steps": [
-   "Oven 220 °C. 250 g potatoes cut into wedges, spray or ½ tsp oil, salt, paprika, on a tray — 25 min, turn once.",
+   "Air fryer 200 °C. 250 g potatoes cut into wedges, ½ tsp oil, salt, paprika. 18–20 min, shake the basket halfway.",
    "In a bowl: 200 g Rinderhackfleisch light, ½ onion grated, 1 tsp mustard, salt, pepper. Mix with a fork, shape 2 flat patties.",
    "Pan on medium-high, no extra oil needed. 4 min a side, until brown and firm.",
    "Salad: lettuce, tomato, cucumber, lemon, salt. 15 g nuts on the salad.",
@@ -254,7 +254,7 @@ const RECIPES = {
  },
  "l2": {
   "id": "l2",
-  "n": "Oven chicken & vegetables",
+  "n": "Air-fryer chicken & vegetables",
   "slots": [
    "lunch",
    "dinner"
@@ -286,10 +286,10 @@ const RECIPES = {
    ]
   ],
   "steps": [
-   "Oven 200 °C. Tray with baking paper.",
+   "Air fryer 190 °C.",
    "200 g chicken breast whole; 1 pepper, ½ onion, ½ courgette in chunks.",
-   "Everything on the tray, 1 tsp oil, paprika, thyme, salt, pepper. Toss with your hands.",
-   "20 min. Chicken is done when the thickest part is white all the way through.",
+   "In a bowl, toss the chicken and vegetables with 1 tsp oil, paprika, thyme, salt and pepper. Put them in the basket in one layer (never loose baking paper in an air fryer).",
+   "16–18 min. Turn the chicken and shake the vegetables halfway. Chicken is done when the thickest part is white all the way through.",
    "Bulgur or rice from the batch on the side."
   ],
   "v": "mTJZravR5Js",
@@ -567,7 +567,7 @@ const RECIPES = {
  },
  "d5": {
   "id": "d5",
-  "n": "Baked fish, wedges & peas",
+  "n": "Air-fryer fish, wedges & peas",
   "slots": [
    "lunch",
    "dinner"
@@ -591,9 +591,9 @@ const RECIPES = {
    ]
   ],
   "steps": [
-   "Oven 200 °C. 250 g potato wedges on one side of the tray, spray of oil, salt, paprika — in first, 10 min head start.",
-   "200 g Seelachs or cod on baking paper, lemon juice, pepper, salt, a little paprika. Onto the tray, 15 min.",
-   "300 g frozen peas and carrots: microwave 4 min.",
+   "Air fryer 200 °C. 250 g potato wedges with a spray of oil, salt, paprika: 12 min first, shake once.",
+   "Push the wedges to one side. Add 200 g Seelachs or cod with lemon juice, pepper, salt and a little paprika. 190 °C, 10–12 more minutes.",
+   "300 g frozen peas and carrots: microwave 4 min, or boil in a pot for 5 min.",
    "Plate, 15 g almonds crushed over the fish, more lemon."
   ],
   "v": "6GezOb4k6uY",
@@ -670,7 +670,7 @@ const RECIPES = {
    ]
   ],
   "steps": [
-   "Oven 220 °C, 250 g potato wedges, 25 min.",
+   "Start the potatoes first: air fryer 200 °C, 250 g potato wedges, 18–20 min, shake halfway. Make the omelette while they cook.",
    "4 eggs whisked with salt and pepper. 100 g cooked chicken from the batch in small pieces.",
    "Pan on medium, 1 tsp oil. Onion and pepper 2 min, a handful of spinach until it wilts.",
    "Eggs in, let them set 1 min, chicken on top, fold in half when the top is nearly set.",
@@ -821,7 +821,7 @@ const RECIPES = {
  },
  "x_salmon_potato": {
   "id": "x_salmon_potato",
-  "n": "Baked salmon, potatoes & green beans",
+  "n": "Air-fryer salmon, potatoes & green beans",
   "slots": [
    "lunch",
    "dinner"
@@ -845,9 +845,9 @@ const RECIPES = {
    ]
   ],
   "steps": [
-   "Oven 200 °C. 250 g potatoes in wedges on a tray with a few drops of oil, paprika, salt. 10 minutes first.",
-   "Add the thawed, dried 150 g salmon to the tray with lemon and pepper. 15 more minutes.",
-   "Microwave 300 g frozen green beans with a splash of water for 4 minutes.",
+   "Air fryer 200 °C. 250 g potato wedges with a few drops of oil, paprika and salt: 12 min first, shake once.",
+   "Add the thawed, patted-dry 150 g salmon with lemon and pepper. 180 °C, 8–10 more minutes, until it flakes.",
+   "300 g frozen green beans: microwave 4 min with a splash of water, or boil in a pot for 6 min.",
    "Plate it all together."
   ],
   "v": "",
